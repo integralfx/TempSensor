@@ -2,7 +2,9 @@
 #include "main.h"
 #include <cstdio>
 #include <cstdarg>
+#include <cstring>
 #include <array>
+
 void SetTempPinMode(bool input)
 {
 	GPIO_InitTypeDef GPIO_InitStruct
@@ -38,16 +40,12 @@ bool WaitForTempPin(bool state, uint32_t timeout_us)
 	}
 }
 
-union RHT03Data
+struct RHT03Data
 {
-	struct
-	{
-		uint16_t humidity;
-		uint16_t temp;
-		uint8_t checksum;
-	};
-	uint8_t bytes[5];
-};
+	uint16_t humidity;
+	uint16_t temp;
+	uint8_t checksum;
+} __attribute__((packed));
 
 void ReadTempData()
 {
@@ -69,56 +67,49 @@ void ReadTempData()
 		return;
 	}
 
-	// Start data transmission
-	std::array<uint8_t, 40> start;
-	std::array<uint8_t, start.size() + 1> stop;
-	for (size_t i = 0; i < start.size(); ++i)
+	constexpr size_t num_bits = 40;
+	std::array<uint8_t, num_bits> low_times, high_times;
+	auto wait_for_pulse = [](bool state)
 	{
-		if (!WaitForTempPin(false, 1000))
-		{
-			PrintLine("Fail 2: %u", i);
-			return;
-		}
-		start[i] = __HAL_TIM_GET_COUNTER(&htim2);
-		if (!WaitForTempPin(true, 1000))
-		{
-			PrintLine("Fail 3: %u", i);
-			return;
-		}
-		stop[i] = __HAL_TIM_GET_COUNTER(&htim2);
-	}
-	if (!WaitForTempPin(false, 1000))
+		uint32_t start = __HAL_TIM_GET_COUNTER(&htim2);
+		while (ReadTempPin() == state) ;
+		return __HAL_TIM_GET_COUNTER(&htim2) - start;
+	};
+	for (size_t i = 0; i < num_bits; ++i)
 	{
-		PrintLine("Fail 4");
-		return;
+		low_times[i] = wait_for_pulse(false);
+		high_times[i] = wait_for_pulse(true);
 	}
-	stop[40] = __HAL_TIM_GET_COUNTER(&htim2);
 
 	RHT03Data data{};
-	for (size_t i = 0; i < start.size(); ++i)
+	uint8_t bytes[sizeof(data)]{};
+	for (size_t i = 0; i < num_bits; ++i)
 	{
-		uint8_t low_time = stop[i] = start[i];
-		uint8_t high_time = start[i + 1] - stop[i];
-		PrintLine("%2u, low time: %3u, high time: %3u, %u", i, low_time, high_time, high_time > low_time);
-		if (high_time > low_time)
-		{
-			data.bytes[i/8] |= 1 << (7 - i%8);
-		}
+		PrintLine("%2u, %3u, %3u", i, low_times[i], high_times[i]);
+	    bytes[i / 8] <<= 1;
+	    if (high_times[i] > low_times[i])
+	    {
+	    	bytes[i / 8] |= 1;
+	    }
 	}
+	//memcpy(&data, bytes, sizeof(data));
+	data.humidity = bytes[0] << 8 | bytes[1];
+	data.temp = bytes[2] << 8 | bytes[3];
+	data.checksum = bytes[4];
 
-	PrintLine("humidity data: %u", data.humidity);
-	PrintLine("temp data: %u", data.temp);
-	PrintLine("checksum data: %u", data.checksum);
+	PrintLine("humidity data: 0x%02X", data.humidity);
+	PrintLine("temp data: 0x%02X", data.temp);
+	PrintLine("checksum data: 0x%02X", data.checksum);
 
-	uint8_t sum = data.bytes[0] + data.bytes[1] + data.bytes[2] + data.bytes[3];
+	uint8_t sum = bytes[0] + bytes[1] + bytes[2] + bytes[3];
 	if (sum != data.checksum)
 	{
 		PrintLine("Checksum mismatch: %u != %u", sum, data.checksum);
 		return;
 	}
 
-	PrintLine("Humidity: %.2f", data.humidity / 10.0);
-	PrintLine("Temp: %.2f", data.temp / 10.0);
+	PrintLine("Humidity: %f", data.humidity / 10.0);
+	PrintLine("Temp: %f", data.temp / 10.0);
 }
 
 void WriteTempPin(bool state)

@@ -94,22 +94,23 @@ int main(void)
 	MX_USART2_Init();
 	/* USER CODE BEGIN 2 */
 	HAL_TIM_Base_Start(&htim2);
-	HAL_Delay(1000);
+	HAL_Delay(2000);
 	ReadTempData();
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
+	bool input = false;
 	while (1)
 	{
-		//PrintLine("%d", __HAL_TIM_GET_COUNTER(&htim2));
-		//HAL_Delay(100);
-		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
-		//WriteTempPin(true);
-		HAL_Delay(1000);
-		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
-		//WriteTempPin(false);
-		HAL_Delay(1000);
+		if (HAL_GPIO_ReadPin(BTN_GPIO_Port, BTN_Pin) == 0)
+		{
+			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, input);
+			//SetTempPinMode(input);
+			input = !input;
+		}
+
+		HAL_Delay(100);
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
@@ -133,14 +134,8 @@ void SystemClock_Config(void)
 	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
 	RCC_OscInitStruct.MSIState = RCC_MSI_ON;
 	RCC_OscInitStruct.MSICalibrationValue = 0;
-	RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
-	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
-	RCC_OscInitStruct.PLL.PLLM = 1;
-	RCC_OscInitStruct.PLL.PLLN = 40;
-	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
-	RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
-	RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+	RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_11;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
 	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
 	{
 		Error_Handler();
@@ -149,12 +144,12 @@ void SystemClock_Config(void)
 	 */
 	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
 			|RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
 	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
 	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
 	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
 	{
 		Error_Handler();
 	}
@@ -191,7 +186,7 @@ static void MX_TIM2_Init(void)
 
 	/* USER CODE END TIM2_Init 1 */
 	htim2.Instance = TIM2;
-	htim2.Init.Prescaler = 80-1;
+	htim2.Init.Prescaler = 48-1;
 	htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
 	htim2.Init.Period = 4294967295;
 	htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -261,10 +256,18 @@ static void MX_GPIO_Init(void)
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
 
 	/* GPIO Ports Clock Enable */
+	__HAL_RCC_GPIOC_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
+	__HAL_RCC_GPIOB_CLK_ENABLE();
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+
+	/*Configure GPIO pin : BTN_Pin */
+	GPIO_InitStruct.Pin = BTN_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	HAL_GPIO_Init(BTN_GPIO_Port, &GPIO_InitStruct);
 
 	/*Configure GPIO pin : TEMP_DATA_Pin */
 	GPIO_InitStruct.Pin = TEMP_DATA_Pin;
