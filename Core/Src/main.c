@@ -94,23 +94,29 @@ int main(void)
 	MX_USART2_Init();
 	/* USER CODE BEGIN 2 */
 	HAL_TIM_Base_Start(&htim2);
-	HAL_Delay(2000);
-	ReadTempData();
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-	bool input = false;
+	uint32_t last_update_time = HAL_GetTick();
 	while (1)
 	{
-		if (HAL_GPIO_ReadPin(BTN_GPIO_Port, BTN_Pin) == 0)
+		uint32_t now = HAL_GetTick();
+		if (now - last_update_time > 2000)
 		{
-			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, input);
-			//SetTempPinMode(input);
-			input = !input;
+			float humidity, temp;
+			if (ReadTempData(&humidity, &temp))
+			{
+				PrintLine(
+					"Humidity    : %.1f%%\r\n"
+					"Temperature : %.1f°C\r\n",
+					humidity, temp
+				);
+			}
+			last_update_time = now;
 		}
 
-		HAL_Delay(100);
+		HAL_Delay(1);
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */

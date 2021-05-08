@@ -8,12 +8,14 @@
 extern "C" {
 #endif
 
-void SetTempPinMode(bool input);
 void Delay_us(uint32_t delay);
-bool WaitForTempPin(bool state, uint32_t timeout_us);
-void ReadTempData();
-void WriteTempPin(bool state);
+
+void SetTempPinMode(bool input);
 bool ReadTempPin();
+void WriteTempPin(bool state);
+bool WaitForTempPin(bool state, uint32_t timeout_us);
+uint32_t WaitForTempPinPulse(bool state);
+bool ReadTempData(float* humidity, float* temp);
 
 bool Print(const char* format, ...);
 bool PrintLine(const char* format, ...);
