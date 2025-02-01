@@ -1,4 +1,0 @@
-add_library(Drivers INTERFACE)
-target_link_libraries(Drivers INTERFACE DriversCMSIS INTERFACE DriversSTM32HAL)
-add_subdirectory(CMSIS)
-add_subdirectory(STM32L4xx_HAL_Driver)
