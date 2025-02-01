@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 enable_language(ASM)
 
-set(LINKER_SCRIPT            "../STM32L452REIX_FLASH.ld")
+set(LINKER_SCRIPT            "../STM32L452RETX_FLASH.ld")
 set(MCPU                     "-mcpu=Cortex-M4")
 set(MFPU                     "-mfpu=fpv4-sp-d16")
 set(MFLOAT_ABI               "")
