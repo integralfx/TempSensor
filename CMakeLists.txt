@@ -21,6 +21,12 @@ add_compile_options(${MCPU} ${MFPU} ${MFLOAT_ABI} ${RUNTIME_LIBRARY} -mthumb -Wa
 add_link_options(-T${LINKER_SCRIPT} ${RUNTIME_LIBRARY_SYSCALLS} -Wl,-Map=test.map -Wl,--gc-sections -static -Wl,--start-group -lc -lm -Wl,--end-group -u _printf_float)
 set(CMAKE_ASM_FLAGS "${CMAKE_C_FLAGS} -x assembler-with-cpp")
 
+file(GLOB_RECURSE sources Src/*.c Src/*.cpp)
+add_executable(TempSensor ${sources} Startup/startup_stm32l452reix.s)
+
+target_include_directories(TempSensor PUBLIC Inc)
+target_link_libraries(TempSensor PUBLIC Drivers)
+target_compile_definitions(TempSensor PUBLIC STM32L452xx)
+
 add_subdirectory(config)
-add_subdirectory(Core)
 add_subdirectory(Drivers)
