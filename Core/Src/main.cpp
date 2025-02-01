@@ -1,4 +1,5 @@
-#include "main.h"
+#include "stm32l4xx_hal.h"
+#include "Pins.hpp"
 #include <cstdio>
 #include <cstdarg>
 #include <cstring>
@@ -13,6 +14,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART2_Init(void);
+
+void Error_Handler(void);
 
 uint32_t Timer_100ns();
 uint32_t Timer_us();
