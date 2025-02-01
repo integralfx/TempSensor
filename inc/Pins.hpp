@@ -6,7 +6,7 @@
 // LCD enable pin
 #define LCD_E_Pin GPIO_PIN_3
 #define LCD_E_GPIO_Port GPIOB
-// LCD reset pin
+// LCD register select pin
 #define LCD_RS_Pin GPIO_PIN_10
 #define LCD_RS_GPIO_Port GPIOA
 // LCD data pins
