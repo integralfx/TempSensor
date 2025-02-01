@@ -22,11 +22,11 @@ add_link_options(-T${LINKER_SCRIPT} ${RUNTIME_LIBRARY_SYSCALLS} -Wl,-Map=test.ma
 set(CMAKE_ASM_FLAGS "${CMAKE_C_FLAGS} -x assembler-with-cpp")
 
 file(GLOB_RECURSE sources src/*.c src/*.cpp)
-add_executable(TempSensor ${sources} Startup/startup_stm32l452reix.s)
+add_executable(TempSensor ${sources} startup/startup_stm32l452reix.s)
 
 target_include_directories(TempSensor PUBLIC inc)
 target_link_libraries(TempSensor PUBLIC Drivers)
 target_compile_definitions(TempSensor PUBLIC STM32L452xx)
 
 add_subdirectory(config)
-add_subdirectory(Drivers)
+add_subdirectory(drivers)
