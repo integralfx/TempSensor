@@ -1,0 +1,7 @@
+file(GLOB_RECURSE sources Src/*.c)
+file(GLOB_RECURSE includes Inc/*.h)
+add_library(DriversSTM32HAL STATIC ${sources} ${includes})
+target_include_directories(DriversSTM32HAL PUBLIC Inc)
+target_compile_definitions(DriversSTM32HAL PUBLIC STM32L452xx)
+target_link_libraries(DriversSTM32HAL PUBLIC config PUBLIC DriversCMSIS)
+set_target_properties(DriversSTM32HAL PROPERTIES LINKER_LANGUAGE C)
