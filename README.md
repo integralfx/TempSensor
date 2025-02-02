@@ -1,5 +1,9 @@
 # TempSensor
-STM32 L452RE temperature and humidity sensor using the RHT03 which is displayed on a 16x2 LCD
+Firmware written in C++14 that displays the temperature and humidity on a 16x2 LCD
+
+* STM32 L452RET6
+* RHT03
+* TC1602A-09T
 
 # Design
 
