@@ -9,6 +9,21 @@ Firmware written in C++14 that displays the temperature and humidity on a 16x2 L
 
 * [LCD module](docs/LCD.md)
 
+# Build
+
+To build the firmware, you need:
+* [GNU Arm Toolchain 14.1](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
+* [Ninja 1.12.1](https://community.chocolatey.org/packages/ninja)
+* [CMake 3.31.5](https://community.chocolatey.org/packages/cmake)
+* VS Code
+  * [CMakeTools extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cmake-tools)
+
+1. In VS Code, configure CMake to build for release
+2. Hit `F7` to build
+   * If that doesn't work, press `Ctrl+Shift+P`, type `CMake: Build` and press enter
+
+Use STM32CubeProgrammer to flash the `elf` file in `build/release`
+
 # 5V Tolerant Pins
 | Digital Pin | Port & Pin | 5V Tolerant? |
 | ----------- | ---------- | ------------ |
