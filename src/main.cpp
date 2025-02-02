@@ -186,27 +186,27 @@ static void MX_GPIO_Init(void)
 	__HAL_RCC_GPIOB_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 
-	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOB, LCD_D1_Pin|LCD_E_Pin|LCD_D0_Pin|LCD_D6_Pin
-			|LCD_D2_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOC, LCD_D4_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOA, LCD_RS_Pin|LCD_D4_Pin|LCD_D3_Pin|LED_Pin
-			|LCD_D7_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB, LCD_D1_Pin|LCD_E_Pin|LCD_D0_Pin|LCD_D5_Pin|LCD_RW_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(LCD_D5_GPIO_Port, LCD_D5_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOA, LCD_RS_Pin|LCD_D3_Pin|LED_Pin|LCD_D7_Pin|LCD_D2_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin : BTN_Pin */
 	GPIO_InitStruct.Pin = BTN_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	HAL_GPIO_Init(BTN_GPIO_Port, &GPIO_InitStruct);
+	//
+	GPIO_InitStruct.Pin = LCD_D4_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : LCD_D1_Pin LCD_E_Pin LCD_D0_Pin LCD_D6_Pin
-                           LCD_D2_Pin */
-	GPIO_InitStruct.Pin = LCD_D1_Pin|LCD_E_Pin|LCD_D0_Pin|LCD_D6_Pin
-			|LCD_D2_Pin;
+	GPIO_InitStruct.Pin = LCD_D1_Pin|LCD_E_Pin|LCD_D0_Pin|LCD_D5_Pin|LCD_RW_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -218,22 +218,11 @@ static void MX_GPIO_Init(void)
 	GPIO_InitStruct.Pull = GPIO_PULLUP;
 	HAL_GPIO_Init(TEMP_DATA_GPIO_Port, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : LCD_RS_Pin LCD_D4_Pin LCD_D3_Pin LED_Pin
-                           LCD_D7_Pin */
-	GPIO_InitStruct.Pin = LCD_RS_Pin|LCD_D4_Pin|LCD_D3_Pin|LED_Pin
-			|LCD_D7_Pin;
+	GPIO_InitStruct.Pin = LCD_RS_Pin|LCD_D3_Pin|LED_Pin|LCD_D7_Pin|LCD_D2_Pin|LCD_D6_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-	/*Configure GPIO pin : LCD_D5_Pin */
-	GPIO_InitStruct.Pin = LCD_D5_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(LCD_D5_GPIO_Port, &GPIO_InitStruct);
-
 }
 
 void Error_Handler(void)
