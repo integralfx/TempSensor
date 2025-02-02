@@ -1,11 +1,10 @@
 #include "stm32l4xx_hal.h"
 #include "Pins.hpp"
-#include "LCD.hpp"
+#include "LCD_TC1602A.hpp"
+#include "Serial.hpp"
 #include "Time.hpp"
 #include <array>
-#include <cstdarg>
 #include <cstdio>
-#include <cstring>
 
 TIM_HandleTypeDef htim2;
 USART_HandleTypeDef husart2;
@@ -24,9 +23,6 @@ bool WaitForTempPin(bool state, uint32_t timeout_us);
 uint32_t WaitForTempPinPulse(bool state);
 bool ReadTempData(float* humidity, float* temp);
 
-bool Print(const char* format, ...);
-bool PrintLine(const char* format, ...);
-
 int main(void)
 {
 	HAL_Init();
@@ -39,14 +35,31 @@ int main(void)
 
 	HAL_TIM_Base_Start(&htim2);
 
-	LCD_SetFunction(true, true, true);
+	LCD_TC1602A lcd_tc1602a;
+	ILCD ilcd{ lcd_tc1602a };
+	LCD lcd{ ilcd };
+
+	LCDInit lcd_init
+	{
+		.data_size = LCDInit::DataSize::EightBits,
+		.row_count = LCDInit::Rows::Two,
+		.font_type = LCDInit::FontType::FiveByTenDots,
+		.column_count = 40
+	};
+	lcd.Init(lcd_init);
 	Delay_us(53);
-	LCD_SetControl(true, false, false);
+	LCDSettings lcd_settings
+	{
+		.display_on = true,
+		.cursor_on = false,
+		.cursor_blink = false
+	};
+	lcd.SetSettings(lcd_settings);
 	Delay_us(53);
-	LCD_Clear();
+	lcd.Clear();
 	HAL_Delay(2);
-	LCD_ReturnHome();
-	HAL_Delay(2);
+	lcd.SetCursor(0, 0);
+	Delay_us(53);
 
 	/* Infinite loop */
 	uint32_t last_temp_update = HAL_GetTick();
@@ -56,16 +69,29 @@ int main(void)
 		uint32_t now = HAL_GetTick();
 		if (now - last_temp_update > 2000)
 		{
-			float humidity, temp;
+			float humidity = 0;
+			float temp = 0;
 			if (ReadTempData(&humidity, &temp))
 			{
-				sprintf(buffer, "Humidity : %.1f%%", humidity);
-				LCD_WriteStr(buffer);
-				sprintf(buffer, "Temp     : %.1fC", temp);
-				LCD_SetCursor(1, 0, true);
+				int length = sprintf(buffer, "Humidity : %.1f%%", humidity);
+				for (int i = 0; i < length; i++)
+				{
+					lcd.Write(static_cast<uint8_t>(buffer[i]));
+					Delay_us(53);
+				}
+
+				lcd.SetCursor(1, 0);
 				Delay_us(53);
-				LCD_WriteStr(buffer);
-				LCD_SetCursor(0, 0, true);
+
+				length = sprintf(buffer, "Temp     : %.1fC", temp);
+				for (int i = 0; i < length; i++)
+				{
+					lcd.Write(static_cast<uint8_t>(buffer[i]));
+					Delay_us(53);
+				}
+
+				lcd.SetCursor(0, 0);
+
 //				PrintLine(
 //					"Humidity    : %.1f%%\r\n"
 //					"Temperature : %.1f°C\r\n",
@@ -348,35 +374,4 @@ bool ReadTempData(float* humidity, float* temp)
 	*temp = data.temp / 10.0;
 
 	return true;
-}
-
-bool Print(const char* format, ...)
-{
-	char str[100]{};
-	va_list args;
-	va_start(args, format);
-	int length = vsprintf(str, format, args);
-	va_end(args);
-	if (length < 0)
-	{
-		return false;
-	}
-
-	return HAL_USART_Transmit(&husart2, reinterpret_cast<uint8_t*>(str), length, 1000) == HAL_OK;
-}
-bool PrintLine(const char* format, ...)
-{
-	char str[100]{};
-	va_list args;
-	va_start(args, format);
-	int length = vsprintf(str, format, args);
-	va_end(args);
-	if (length < 0)
-	{
-		return false;
-	}
-	str[length++] = '\r';
-	str[length++] = '\n';
-
-	return HAL_USART_Transmit(&husart2, reinterpret_cast<uint8_t*>(str), length, 1000) == HAL_OK;
 }

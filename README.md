@@ -1,6 +1,10 @@
 # TempSensor
 STM32 L452RE temperature and humidity sensor using the RHT03 which is displayed on a 16x2 LCD
 
+# Design
+
+* [LCD module](docs/LCD.md)
+
 # 5V Tolerant Pins
 | Digital Pin | Port & Pin | 5V Tolerant? |
 | ----------- | ---------- | ------------ |

@@ -5,92 +5,102 @@
 #include <array>
 #include <utility>
 
-void LCD_SetRS(bool rs)
+bool ILCD::SendCommand(const LCDCommand& cmd)
 {
-	HAL_GPIO_WritePin(LCD_RS_GPIO_Port, LCD_RS_Pin, rs ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    return m_send_cmd(m_ilcd_base_ptr, cmd);
 }
 
-void LCD_SetEnable(bool enable)
+LCD::LCD(ILCD& ilcd) : m_ilcd{ ilcd }
 {
-	HAL_GPIO_WritePin(LCD_E_GPIO_Port, LCD_E_Pin, enable ? GPIO_PIN_SET : GPIO_PIN_RESET);
+
 }
 
-void LCD_SetData(uint8_t data)
+bool LCD::Init(const LCDInit& lcd_init)
 {
-	static std::array<std::pair<GPIO_TypeDef*, uint16_t>, 8> LCD_data_pins
-	{ {
-		{ LCD_D0_GPIO_Port, LCD_D0_Pin },
-		{ LCD_D1_GPIO_Port, LCD_D1_Pin },
-		{ LCD_D2_GPIO_Port, LCD_D2_Pin },
-		{ LCD_D3_GPIO_Port, LCD_D3_Pin },
-		{ LCD_D4_GPIO_Port, LCD_D4_Pin },
-		{ LCD_D5_GPIO_Port, LCD_D5_Pin },
-		{ LCD_D6_GPIO_Port, LCD_D6_Pin },
-		{ LCD_D7_GPIO_Port, LCD_D7_Pin }
-	} };
-
-	for (size_t i = 0; i < LCD_data_pins.size(); ++i)
-	{
-		auto& pin = LCD_data_pins[i];
-		HAL_GPIO_WritePin(pin.first, pin.second, static_cast<GPIO_PinState>((data >> i) & 0x1));
-	}
+    LCDCommand cmd
+    {
+        .register_select = LCDCommand::RegisterSelect::Instruction,
+        .io_mode = LCDCommand::IOMode::Write,
+        .data = static_cast<uint8_t>(
+            0b100000 | (static_cast<uint8_t>(lcd_init.data_size) << 4)
+                     | (static_cast<uint8_t>(lcd_init.row_count) << 3)
+                     | (static_cast<uint8_t>(lcd_init.font_type) << 2)
+        )
+    };
+    bool result = m_ilcd.SendCommand(cmd);
+    if (result)
+    {
+        m_init = lcd_init;
+    }
+    return result;
 }
 
-void LCD_SendData(bool rs, uint8_t data)
+LCDSettings LCD::GetSettings() const
 {
-	LCD_SetRS(rs);
-	Delay_100ns(1);
-	LCD_SetEnable(true);
-	LCD_SetData(data);
-	Delay_100ns(2);	// Min tPW is 150ns.
-	LCD_SetEnable(false);
+    return m_settings;
 }
 
-void LCD_Clear()
+bool LCD::SetSettings(const LCDSettings& lcd_settings)
 {
-	LCD_SendData(false, 1);
+    auto to_bit = [](bool b) -> uint8_t { return b ? 1 : 0; };
+    LCDCommand cmd
+    {
+        .register_select = LCDCommand::RegisterSelect::Instruction,
+        .io_mode = LCDCommand::IOMode::Write,
+        .data = static_cast<uint8_t>(
+            0b1000 | (to_bit(lcd_settings.display_on) << 2)
+                   | (to_bit(lcd_settings.cursor_on) << 1)
+                   | to_bit(lcd_settings.cursor_blink)
+        )
+    };
+    bool result = m_ilcd.SendCommand(cmd);
+    if (result)
+    {
+        m_settings = lcd_settings;
+    }
+    return result;
 }
 
-void LCD_ReturnHome()
+bool LCD::Clear()
 {
-	LCD_SendData(false, 0b10);
+    LCDCommand cmd
+    {
+        .register_select = LCDCommand::RegisterSelect::Instruction,
+        .io_mode = LCDCommand::IOMode::Write,
+        .data = 1
+    };
+    return m_ilcd.SendCommand(cmd);
 }
 
-void LCD_SetControl(bool display_on, bool cursor_on, bool cursor_blink)
+bool LCD::Write(uint8_t data)
 {
-	LCD_SendData(false, 0b1000 | (display_on << 2) | (cursor_on << 1) | cursor_blink);
+    LCDCommand cmd
+    {
+        .register_select = LCDCommand::RegisterSelect::Data,
+        .io_mode = LCDCommand::IOMode::Write,
+        .data = data
+    };
+    return m_ilcd.SendCommand(cmd);
 }
 
-void LCD_SetFunction(bool data_8bit, bool two_lines, bool font_10dots)
+bool LCD::SetCursor(uint8_t row, uint8_t col)
 {
-	LCD_SendData(false, 0b100000 | (data_8bit << 4) | (two_lines << 3) | (font_10dots << 2));
+    if (row > static_cast<uint8_t>(m_init.row_count) || col > m_init.column_count)
+    {
+        return false;
+    }
+
+	uint8_t address = row * m_init.column_count + col;
+	LCDCommand cmd
+    {
+        .register_select = LCDCommand::RegisterSelect::Instruction,
+        .io_mode = LCDCommand::IOMode::Write,
+        .data = static_cast<uint8_t>(0b10000000 | address)
+    };
+    return m_ilcd.SendCommand(cmd);
 }
 
-void LCD_MoveScreen(bool right)
+bool LCD::IsBusy(uint8_t& address_counter)
 {
-	//LCD_SendData(false, 0b11000 | (right << 2));
-	LCD_SendData(false, right ? 0b11100 : 0b11000);
-}
-
-void LCD_SetCursor(int row, int col, bool two_lines)
-{
-	row = std::min(row, two_lines ? 1 : 0);
-	col = std::min(col, two_lines ? 39 : 79);
-
-	uint8_t address = two_lines ? row * 40 + col : row + col;
-	LCD_SendData(false, 0b10000000 | address);
-}
-
-void LCD_WriteChar(char c)
-{
-	LCD_SendData(true, static_cast<uint8_t>(c));
-}
-
-void LCD_WriteStr(const char* str)
-{
-	while (*str)
-	{
-		LCD_WriteChar(*str++);
-		Delay_us(53);
-	}
+    return false;
 }
