@@ -2,14 +2,26 @@
 
 [Datasheet (TC1602A-09T)](https://cdn-shop.adafruit.com/product-files/181/p181.pdf)
 
+## Commands
+
+This LCD has 2 command types indicated by the register select bit:
+* 0: Instruction
+* 1: Data
+
+Additionally, you can specify the IO direction, indicated by the read write bit:
+* 0: Write
+* 1: Read
+
+Refer to p10 of the datasheet for the list of commands.
+
+## Initialisation
+
+The LCD will automatically initialise on bootup.
+
+The data size (4 or 8 bits), number of lines and character font must be set during this phase. They can not changed after.
+
 ```mermaid
 classDiagram
-    class LCDCommand {
-        +enum register_select
-        +enum io_mode
-        +uint8_t data
-    }
-
     class LCDInit {
         +enum data_size
         +enum row_count
@@ -24,7 +36,14 @@ classDiagram
     }
 
     class ILCDBase~T~ {
-        +SendCommand(cmd) bool
+        +Init(lcd_init) bool
+        +GetSettings() LCDSettings
+        +SetSettings(lcd_settings) bool
+        +Clear() bool
+        +Read(&data) bool
+        +Write(data) bool
+        +SetCursor(row, col) bool
+        +IsBusy(&address_counter) bool
     }
 
     class ILCD {
@@ -32,7 +51,14 @@ classDiagram
         -m_send_cmd
 
         +ILCD(ilcd_base)
-        +SendCommand(cmd) bool
+        +Init(lcd_init) bool
+        +GetSettings() LCDSettings
+        +SetSettings(lcd_settings) bool
+        +Clear() bool
+        +Read(&data) bool
+        +Write(data) bool
+        +SetCursor(row, col) bool
+        +IsBusy(&address_counter) bool
     }
 
     class LCD {
@@ -45,13 +71,21 @@ classDiagram
         +GetSettings() LCDSettings
         +SetSettings(lcd_settings) bool
         +Clear() bool
+        +Read(&data) bool
         +Write(data) bool
         +SetCursor(row, col) bool
         +IsBusy(&address_counter) bool
     }
 
     class LCD_TC1602A {
-        +SendCommand(cmd) bool
+        +Init(lcd_init) bool
+        +GetSettings() LCDSettings
+        +SetSettings(lcd_settings) bool
+        +Clear() bool
+        +Read(&data) bool
+        +Write(data) bool
+        +SetCursor(row, col) bool
+        +IsBusy(&address_counter) bool
     }
 
     ILCDBase~T~ <.. ILCD
@@ -59,30 +93,57 @@ classDiagram
     ILCD <|-- LCD_TC1602A
 ```
 
-`ILCDBase<T>` uses CRTP to achieve polymorphism. The concrete implementation (`LCD_TC1602A`) will inherit this base class and implement `SendCommand()`. This allows the interface (`ILCDBase<T>`) to use the concrete implementation (`LCD_TC1602A`).
+`ILCDBase<T>` uses CRTP to achieve polymorphism. The concrete implementation (`LCD_TC1602A`) will inherit this base class and implement all of the functions. This allows the interface (`ILCDBase<T>`) to use the concrete implementation (`LCD_TC1602A`).
 
 ```cpp
 template<typename T>
 class ILCDBase
 {
-    bool SendCommand(const LCDCommand& cmd)
+public:
+    void Init(const LCDInit& init)
     {
-        return static_cast<T*>(this)->SendCommand(cmd);
-    }    
+        return Impl().Init(init);
+    }
+    // ...
+
+private:
+    T& Impl()
+    {
+        return *static_cast<T*>(this);
+    }
 };
+
+class ILCD
+{
+public:
+    template<typename T>
+    explicit ILCD(ILCDBase<T>& ilcd_base)
+    {
+        m_ilcd_base_ptr = &ilcd_base;
+        auto impl = +[](void* this_ptr) { return *static_cast<ILCDBase<T>*>(this_ptr); };
+        m_init = +[](void* this_ptr, const LCDInit& init) { impl(this_ptr).Init(init); };
+        // ...
+    }
+
+private:
+    void* m_ilcd_base_ptr;
+    using init_fn = void(*)(void*, const LCDInit&);
+    init_fn m_init;
+}
 
 class LCD_TC1602A : ILCDBase<LCDImpl>
 {
-    bool SendCommand(const LCDCommand& cmd)
+    bool Init(const LCDInit& init)
     {
         // ...
     }
+    // ...
 };
 ```
 
 The issue that comes with this approach is that you will need to make `LCD` a templated class since you don't know what `T` is.
 
-To solve this, we can use type-erasure and store the object pointer and function pointer. We can use some template magic to capture `T` in the constructor, allowing us to call `T::SendCommand()`. This is the `ILCD` class.
+To solve this, we can use type-erasure which will convert the object pointer to `void*`. We store the address of the concrete implementation's object and the function pointer (note the extra `void*` parameter). We can use some template magic to capture `T` in the constructor, allowing us to call `T::Init()`. This is the `ILCD` class.
 
 We can then inject `ILCD` into `LCD` which means `LCD` only relies on the interface rather than the concrete implementation. This will allow us inject a fake `ILCD` during unit tests.
 

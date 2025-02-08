@@ -5,9 +5,39 @@
 #include <array>
 #include <utility>
 
-bool ILCD::SendCommand(const LCDCommand& cmd)
+void ILCD::Init(const LCDInit& init)
 {
-    return m_send_cmd(m_ilcd_base_ptr, cmd);
+    m_init(m_impl_ptr, init);
+}
+
+void ILCD::SetSettings(const LCDSettings& settings)
+{
+    m_set_settings(m_impl_ptr, settings);
+}
+
+void ILCD::Clear()
+{
+    m_clear(m_impl_ptr);
+}
+
+void ILCD::SetAddress(uint8_t address)
+{
+    m_set_address(m_impl_ptr, address);
+}
+
+void ILCD::Read(uint8_t& out_data)
+{
+    m_read(m_impl_ptr, out_data);
+}
+
+void ILCD::Write(uint8_t data)
+{
+    m_write(m_impl_ptr, data);
+}
+
+bool ILCD::IsBusy(uint8_t& address_counter)
+{
+    return m_is_busy(m_impl_ptr, address_counter);
 }
 
 LCD::LCD(ILCD& ilcd) : m_ilcd{ ilcd }
@@ -15,24 +45,10 @@ LCD::LCD(ILCD& ilcd) : m_ilcd{ ilcd }
 
 }
 
-bool LCD::Init(const LCDInit& lcd_init)
+void LCD::Init(const LCDInit& init)
 {
-    LCDCommand cmd
-    {
-        .register_select = LCDCommand::RegisterSelect::Instruction,
-        .io_mode = LCDCommand::IOMode::Write,
-        .data = static_cast<uint8_t>(
-            0b100000 | (static_cast<uint8_t>(lcd_init.data_size) << 4)
-                     | (static_cast<uint8_t>(lcd_init.row_count) << 3)
-                     | (static_cast<uint8_t>(lcd_init.font_type) << 2)
-        )
-    };
-    bool result = m_ilcd.SendCommand(cmd);
-    if (result)
-    {
-        m_init = lcd_init;
-    }
-    return result;
+    m_ilcd.Init(init);
+    m_init = init;
 }
 
 LCDSettings LCD::GetSettings() const
@@ -40,67 +56,55 @@ LCDSettings LCD::GetSettings() const
     return m_settings;
 }
 
-bool LCD::SetSettings(const LCDSettings& lcd_settings)
+void LCD::SetSettings(const LCDSettings& settings)
 {
-    auto to_bit = [](bool b) -> uint8_t { return b ? 1 : 0; };
-    LCDCommand cmd
-    {
-        .register_select = LCDCommand::RegisterSelect::Instruction,
-        .io_mode = LCDCommand::IOMode::Write,
-        .data = static_cast<uint8_t>(
-            0b1000 | (to_bit(lcd_settings.display_on) << 2)
-                   | (to_bit(lcd_settings.cursor_on) << 1)
-                   | to_bit(lcd_settings.cursor_blink)
-        )
-    };
-    bool result = m_ilcd.SendCommand(cmd);
-    if (result)
-    {
-        m_settings = lcd_settings;
-    }
-    return result;
+    m_ilcd.SetSettings(settings);
+    m_settings = settings;
 }
 
-bool LCD::Clear()
+void LCD::Clear()
 {
-    LCDCommand cmd
-    {
-        .register_select = LCDCommand::RegisterSelect::Instruction,
-        .io_mode = LCDCommand::IOMode::Write,
-        .data = 1
-    };
-    return m_ilcd.SendCommand(cmd);
+    m_ilcd.Clear();
 }
 
-bool LCD::Write(uint8_t data)
+void LCD::SetAddress(uint8_t address)
 {
-    LCDCommand cmd
-    {
-        .register_select = LCDCommand::RegisterSelect::Data,
-        .io_mode = LCDCommand::IOMode::Write,
-        .data = data
-    };
-    return m_ilcd.SendCommand(cmd);
+    m_ilcd.SetAddress(address);
 }
 
 bool LCD::SetCursor(uint8_t row, uint8_t col)
 {
-    if (row > static_cast<uint8_t>(m_init.row_count) || col > m_init.column_count)
+    auto row_count = [&]() -> uint8_t
+    {
+        switch (m_init.row_count)
+        {
+        case LCDInit::Rows::One: return 1;
+        case LCDInit::Rows::Two: return 2;
+        }
+        __builtin_unreachable();
+    }();
+
+    if (row > row_count || col > m_init.column_count)
     {
         return false;
     }
 
-	uint8_t address = row * m_init.column_count + col;
-	LCDCommand cmd
-    {
-        .register_select = LCDCommand::RegisterSelect::Instruction,
-        .io_mode = LCDCommand::IOMode::Write,
-        .data = static_cast<uint8_t>(0b10000000 | address)
-    };
-    return m_ilcd.SendCommand(cmd);
+    uint8_t address = row * m_init.column_count + row;
+    SetAddress(0b10000000 | address);
+    return true;
+}
+
+void LCD::Read(uint8_t& out_data)
+{
+    m_ilcd.Read(out_data);
+}
+
+void LCD::Write(uint8_t data)
+{
+    m_ilcd.Write(data);
 }
 
 bool LCD::IsBusy(uint8_t& address_counter)
 {
-    return false;
+    return m_ilcd.IsBusy(address_counter);
 }

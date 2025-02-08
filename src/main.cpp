@@ -23,7 +23,7 @@ bool WaitForTempPin(bool state, uint32_t timeout_us);
 uint32_t WaitForTempPinPulse(bool state);
 bool ReadTempData(float* humidity, float* temp);
 
-int main(void)
+int main()
 {
 	HAL_Init();
 
@@ -47,7 +47,6 @@ int main(void)
 		.column_count = 40
 	};
 	lcd.Init(lcd_init);
-	Delay_us(53);
 	LCDSettings lcd_settings
 	{
 		.display_on = true,
@@ -55,19 +54,16 @@ int main(void)
 		.cursor_blink = false
 	};
 	lcd.SetSettings(lcd_settings);
-	Delay_us(53);
 	lcd.Clear();
-	HAL_Delay(2);
 	lcd.SetCursor(0, 0);
-	Delay_us(53);
 
-	/* Infinite loop */
+	static constexpr uint32_t update_interval_ms = 2000;
 	uint32_t last_temp_update = HAL_GetTick();
 	char buffer[16+1] = { 0 };
 	while (1)
 	{
 		uint32_t now = HAL_GetTick();
-		if (now - last_temp_update > 2000)
+		if (now - last_temp_update > update_interval_ms)
 		{
 			float humidity = 0;
 			float temp = 0;
@@ -77,27 +73,23 @@ int main(void)
 				for (int i = 0; i < length; i++)
 				{
 					lcd.Write(static_cast<uint8_t>(buffer[i]));
-					Delay_us(53);
 				}
 
 				lcd.SetCursor(1, 0);
-				Delay_us(53);
 
 				length = sprintf(buffer, "Temp     : %.1fC", temp);
 				for (int i = 0; i < length; i++)
 				{
 					lcd.Write(static_cast<uint8_t>(buffer[i]));
-					Delay_us(53);
 				}
 
 				lcd.SetCursor(0, 0);
 
-//				PrintLine(
-//					"Humidity    : %.1f%%\r\n"
-//					"Temperature : %.1f°C\r\n",
-//					humidity, temp
-//				);
-
+				// PrintLine(
+				// 	"Humidity    : %.1f%%\r\n"
+				// 	"Temperature : %.1f°C\r\n",
+				// 	humidity, temp
+				// );
 			}
 
 			last_temp_update = now;
