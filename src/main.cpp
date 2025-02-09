@@ -55,10 +55,6 @@ int main()
 	};
 	lcd.SetSettings(lcd_settings);
 	lcd.Clear();
-	if (!lcd.SetCursor(0, 0))
-	{
-		Error_Handler(__FILE__, __LINE__);
-	}
 
 	static constexpr uint32_t update_interval_ms = 2000;
 	uint32_t last_temp_update = HAL_GetTick();
@@ -72,20 +68,24 @@ int main()
 			float temp = 0;
 			if (ReadTempData(&humidity, &temp))
 			{
-				int length = sprintf(reinterpret_cast<char*>(buffer.data()), "Humidity : %.1f%%", humidity);
-				lcd.WriteRow({ buffer.begin(), buffer.begin() + length });
+				if (!lcd.SetCursor(0, 0))
+				{
+					Error_Handler(__FILE__, __LINE__);
+				}
+
+				{
+					auto length = sprintf(reinterpret_cast<char*>(buffer.data()), "Humidity : %.1f%%", humidity);
+					lcd.WriteRow({ buffer.begin(), buffer.begin() + length });
+				}
 
 				if (!lcd.SetCursor(1, 0))
 				{
 					Error_Handler(__FILE__, __LINE__);
 				}
 
-				length = sprintf(reinterpret_cast<char*>(buffer.data()), "Temp     : %.1fC", temp);
-				lcd.WriteRow({ buffer.begin(), buffer.begin() + length });
-
-				if (!lcd.SetCursor(0, 0))
 				{
-					Error_Handler(__FILE__, __LINE__);
+					auto length = sprintf(reinterpret_cast<char*>(buffer.data()), "Temp     : %.1fC", temp);
+					lcd.WriteRow({ buffer.begin(), buffer.begin() + length });
 				}
 
 				// PrintLine(
