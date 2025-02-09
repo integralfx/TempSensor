@@ -62,7 +62,7 @@ int main()
 
 	static constexpr uint32_t update_interval_ms = 2000;
 	uint32_t last_temp_update = HAL_GetTick();
-	char buffer[16+1] = { 0 };
+	std::array<uint8_t, 16> buffer;
 	while (1)
 	{
 		uint32_t now = HAL_GetTick();
@@ -72,22 +72,16 @@ int main()
 			float temp = 0;
 			if (ReadTempData(&humidity, &temp))
 			{
-				int length = sprintf(buffer, "Humidity : %.1f%%", humidity);
-				for (int i = 0; i < length; i++)
-				{
-					lcd.Write(static_cast<uint8_t>(buffer[i]));
-				}
+				int length = sprintf(reinterpret_cast<char*>(buffer.data()), "Humidity : %.1f%%", humidity);
+				lcd.WriteRow({ buffer.begin(), buffer.begin() + length });
 
 				if (!lcd.SetCursor(1, 0))
 				{
 					Error_Handler(__FILE__, __LINE__);
 				}
 
-				length = sprintf(buffer, "Temp     : %.1fC", temp);
-				for (int i = 0; i < length; i++)
-				{
-					lcd.Write(static_cast<uint8_t>(buffer[i]));
-				}
+				length = sprintf(reinterpret_cast<char*>(buffer.data()), "Temp     : %.1fC", temp);
+				lcd.WriteRow({ buffer.begin(), buffer.begin() + length });
 
 				if (!lcd.SetCursor(0, 0))
 				{

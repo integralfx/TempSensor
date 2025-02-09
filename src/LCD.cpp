@@ -35,6 +35,11 @@ void ILCD::Write(uint8_t data) noexcept
     m_write(m_impl_ptr, data);
 }
 
+size_t ILCD::WriteRow(const std::span<uint8_t>& data) noexcept
+{
+    return m_write_row(m_impl_ptr, data);
+}
+
 bool ILCD::IsBusy(uint8_t& address_counter) noexcept
 {
     return m_is_busy(m_impl_ptr, address_counter);
@@ -74,16 +79,7 @@ void LCD::SetAddress(uint8_t address) noexcept
 
 bool LCD::SetCursor(uint8_t row, uint8_t col) noexcept
 {
-    auto row_count = [&]() -> uint8_t
-    {
-        switch (m_init.row_count)
-        {
-        case LCDInit::Rows::One: return 1;
-        case LCDInit::Rows::Two: return 2;
-        }
-        return 0;
-    }();
-
+    auto row_count = GetRowCount();
     if (row >= row_count || col >= m_init.column_count)
     {
         return false;
@@ -104,7 +100,27 @@ void LCD::Write(uint8_t data) noexcept
     m_ilcd.Write(data);
 }
 
+size_t LCD::WriteRow(const std::span<uint8_t>& data) noexcept
+{
+    uint8_t address_counter;
+    UNUSED(IsBusy(address_counter));
+    auto total_cells = GetRowCount() * m_init.column_count;
+    auto available_cells = total_cells - address_counter;
+    auto size = std::min(data.size(), available_cells);
+    return m_ilcd.WriteRow(data.subspan(0, size));
+}
+
 bool LCD::IsBusy(uint8_t& address_counter) noexcept
 {
     return m_ilcd.IsBusy(address_counter);
+}
+
+size_t LCD::GetRowCount() const noexcept
+{
+    switch (m_init.row_count)
+    {
+    case LCDInit::Rows::One: return 1;
+    case LCDInit::Rows::Two: return 2;
+    }
+    return 0;
 }

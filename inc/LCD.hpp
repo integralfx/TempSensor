@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <span>
 
 struct LCDInit
 {
@@ -62,6 +63,10 @@ public:
     {
         Impl().Write(data);
     }
+    [[nodiscard]] size_t WriteRow(const std::span<uint8_t>& data) noexcept
+    {
+        return Impl().WriteRow(data);
+    }
     [[nodiscard]] bool IsBusy(uint8_t& address_counter) noexcept
     {
         return Impl().IsBusy(address_counter);
@@ -88,6 +93,7 @@ public:
         m_set_address = +[](void* this_ptr, uint8_t address) noexcept { impl(this_ptr).SetAddress(address); };
         m_read = +[](void* this_ptr, uint8_t& out_data) noexcept { impl(this_ptr).Read(out_data); };
         m_write = +[](void* this_ptr, uint8_t data) noexcept { impl(this_ptr).Write(data); };
+        m_write_row = +[](void* this_ptr, const std::span<uint8_t>& data) noexcept { return impl(this_ptr).WriteRow(data); };
         m_is_busy = +[](void* this_ptr, uint8_t& address_counter) noexcept { return impl(this_ptr).IsBusy(address_counter); };
     }
 
@@ -97,6 +103,7 @@ public:
     void SetAddress(uint8_t address) noexcept;
     void Read(uint8_t& out_data) noexcept;
     void Write(uint8_t data) noexcept;
+    [[nodiscard]] size_t WriteRow(const std::span<uint8_t>& data) noexcept;
     [[nodiscard]] bool IsBusy(uint8_t& address_counter) noexcept;
 
 private:
@@ -107,6 +114,7 @@ private:
     using set_address_fn = void(*)(void*, uint8_t) noexcept;
     using read_fn = void(*)(void*, uint8_t&) noexcept;
     using write_fn = void(*)(void*, uint8_t) noexcept;
+    using write_row_fn = size_t(*)(void*, const std::span<uint8_t>&) noexcept;
     using is_busy_fn = bool(*)(void*, uint8_t&) noexcept;
     init_fn m_init;
     set_settings_fn m_set_settings;
@@ -114,6 +122,7 @@ private:
     set_address_fn m_set_address;
     read_fn m_read;
     write_fn m_write;
+    write_row_fn m_write_row;
     is_busy_fn m_is_busy;
 };
 
@@ -130,10 +139,13 @@ public:
     [[nodiscard]] bool SetCursor(uint8_t row, uint8_t col) noexcept;
     void Read(uint8_t& out_data) noexcept;
     void Write(uint8_t data) noexcept;
+    size_t WriteRow(const std::span<uint8_t>& data) noexcept;
     [[nodiscard]] bool IsBusy(uint8_t& address_counter) noexcept;
 
 private:
     ILCD& m_ilcd;
     LCDInit m_init;
     LCDSettings m_settings;
+
+    [[nodiscard]] size_t GetRowCount() const noexcept;
 };

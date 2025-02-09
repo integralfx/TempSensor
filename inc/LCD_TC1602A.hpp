@@ -7,16 +7,17 @@ class LCD_TC1602A : public ILCDBase<LCD_TC1602A>
 public:
     using data_t = std::bitset<8>;
 
-    void Init(const LCDInit& init);
-    void SetSettings(const LCDSettings& settings);
-    void Clear();
-    void SetAddress(uint8_t address);
-    void Read(uint8_t& out_data);
-    void Write(uint8_t data);
-    bool IsBusy(uint8_t& address_counter);
+    void Init(const LCDInit& init) noexcept;
+    void SetSettings(const LCDSettings& settings) noexcept;
+    void Clear() noexcept;
+    void SetAddress(uint8_t address) noexcept;
+    void Read(uint8_t& out_data) noexcept;
+    void Write(uint8_t data) noexcept;
+    [[nodiscard]] size_t WriteRow(const std::span<uint8_t>& data) noexcept;
+    [[nodiscard]] bool IsBusy(uint8_t& address_counter) noexcept;
 
 private:
-    bool WaitUntilReady(uint32_t timeout_ms);  // TODO: Add timeout
+    bool WaitUntilReady(uint32_t timeout_ms) noexcept;
 
     enum class IOMode : uint8_t
     {
@@ -30,16 +31,19 @@ private:
         Data
     };
 
-    void SetupDataPins(IOMode mode);
+    void SetupDataPins(IOMode mode) noexcept;
 
-    void SetRS(RegisterSelect rs);
-    void SetIOMode(IOMode mode);
-    void SetEnable(bool enable);
+    void SetRS(RegisterSelect rs) noexcept;
+    void SetIOMode(IOMode mode) noexcept;
+    void SetEnable(bool enable) noexcept;
 
-    void SetData(data_t data);
-    data_t ReadData();
+    void SetData(data_t data) noexcept;
+    [[nodiscard]] data_t ReadData() noexcept;
 
-    void SetupCommand(RegisterSelect rs, IOMode mode);
-    void SendWriteCommand(RegisterSelect rs, data_t data);
-    data_t SendReadCommand(RegisterSelect rs);
+    void SetupCommand(RegisterSelect rs, IOMode mode) noexcept;
+    void SendWriteCommand(RegisterSelect rs, data_t data) noexcept;
+    void SendWriteCommand(RegisterSelect rs, const std::span<uint8_t>& data) noexcept;
+    [[nodiscard]] data_t SendReadCommand(RegisterSelect rs) noexcept;
+
+    friend class AutoEnable;
 };

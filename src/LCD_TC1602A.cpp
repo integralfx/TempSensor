@@ -21,7 +21,24 @@ namespace
     } };
 }
 
-void LCD_TC1602A::Init(const LCDInit& init)
+class AutoEnable
+{
+public:
+    [[nodiscard]] AutoEnable(LCD_TC1602A& lcd) noexcept : m_lcd{ lcd }
+    {
+        m_lcd.SetEnable(true);
+    }
+
+    ~AutoEnable() noexcept
+    {
+        m_lcd.SetEnable(false);
+    }
+
+private:
+    LCD_TC1602A& m_lcd;
+};
+
+void LCD_TC1602A::Init(const LCDInit& init) noexcept
 {
     data_t data;
     data.set(5);
@@ -31,7 +48,7 @@ void LCD_TC1602A::Init(const LCDInit& init)
     SendWriteCommand(RegisterSelect::Instruction, data);
 }
 
-void LCD_TC1602A::SetSettings(const LCDSettings& settings)
+void LCD_TC1602A::SetSettings(const LCDSettings& settings) noexcept
 {
     data_t data;
     data.set(3);
@@ -41,30 +58,36 @@ void LCD_TC1602A::SetSettings(const LCDSettings& settings)
     SendWriteCommand(RegisterSelect::Instruction, data);
 }
 
-void LCD_TC1602A::Clear()
+void LCD_TC1602A::Clear() noexcept
 {
     data_t data;
     data.set(0);
     SendWriteCommand(RegisterSelect::Instruction, data);
 }
 
-void LCD_TC1602A::SetAddress(uint8_t address)
+void LCD_TC1602A::SetAddress(uint8_t address) noexcept
 {
     SendWriteCommand(RegisterSelect::Instruction, address);
 }
 
-void LCD_TC1602A::Read(uint8_t& out_data)
+void LCD_TC1602A::Read(uint8_t& out_data) noexcept
 {
     auto data = SendReadCommand(RegisterSelect::Data);
     out_data = static_cast<uint8_t>(data.to_ulong());
 }
 
-void LCD_TC1602A::Write(uint8_t data)
+void LCD_TC1602A::Write(uint8_t data) noexcept
 {
     SendWriteCommand(RegisterSelect::Data, data);
 }
 
-bool LCD_TC1602A::IsBusy(uint8_t& address_counter)
+size_t LCD_TC1602A::WriteRow(const std::span<uint8_t>& data) noexcept
+{
+    SendWriteCommand(RegisterSelect::Data, data);
+    return data.size();
+}
+
+bool LCD_TC1602A::IsBusy(uint8_t& address_counter) noexcept
 {
     static constexpr data_t address_mask{ 0b1111111 };
 
@@ -73,25 +96,27 @@ bool LCD_TC1602A::IsBusy(uint8_t& address_counter)
     return data.test(7);
 }
 
-bool LCD_TC1602A::WaitUntilReady(uint32_t timeout_ms)
+bool LCD_TC1602A::WaitUntilReady(uint32_t timeout_ms) noexcept
 {
     static constexpr uint32_t poll_interval_us = 10;
     const uint32_t max_cycles = (timeout_ms * 1000) / poll_interval_us;
 
-    uint32_t count = 0;
-    uint8_t ac = 0;
-    bool is_busy = false;
-    do 
+    for (uint32_t i = 0; i < max_cycles; ++i)
     {
         Delay_us(poll_interval_us);
-        is_busy = IsBusy(ac);
-        ++count;
-    } while(is_busy && count < max_cycles);
 
-    return is_busy;
+        uint8_t ac = 0;
+        auto is_busy = IsBusy(ac);
+        if (!is_busy)
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
-void LCD_TC1602A::SetupDataPins(IOMode mode)
+void LCD_TC1602A::SetupDataPins(IOMode mode) noexcept
 {
     GPIO_InitTypeDef init{};
     init.Pull = GPIO_NOPULL;
@@ -117,7 +142,7 @@ void LCD_TC1602A::SetupDataPins(IOMode mode)
     HAL_GPIO_Init(GPIOC, &init);
 }
 
-void LCD_TC1602A::SetRS(RegisterSelect rs)
+void LCD_TC1602A::SetRS(RegisterSelect rs) noexcept
 {
     auto pin_state = [rs]() 
     {
@@ -131,7 +156,7 @@ void LCD_TC1602A::SetRS(RegisterSelect rs)
     HAL_GPIO_WritePin(LCD_RS_GPIO_Port, LCD_RS_Pin, pin_state);
 }
 
-void LCD_TC1602A::SetIOMode(IOMode mode)
+void LCD_TC1602A::SetIOMode(IOMode mode) noexcept
 {
     auto pin_state = [mode]() 
     {
@@ -145,12 +170,12 @@ void LCD_TC1602A::SetIOMode(IOMode mode)
     HAL_GPIO_WritePin(LCD_RW_GPIO_Port, LCD_RW_Pin, pin_state);
 }
 
-void LCD_TC1602A::SetEnable(bool enable)
+void LCD_TC1602A::SetEnable(bool enable) noexcept
 {
     HAL_GPIO_WritePin(LCD_E_GPIO_Port, LCD_E_Pin, enable ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
-void LCD_TC1602A::SetData(data_t data)
+void LCD_TC1602A::SetData(data_t data) noexcept
 {
     for (size_t i = 0; i < lcd_data_pins.size(); ++i)
     {
@@ -159,7 +184,7 @@ void LCD_TC1602A::SetData(data_t data)
     }
 }
 
-LCD_TC1602A::data_t LCD_TC1602A::ReadData()
+LCD_TC1602A::data_t LCD_TC1602A::ReadData() noexcept
 {
     data_t data;
     for (size_t i = 0; i < lcd_data_pins.size(); ++i)
@@ -171,7 +196,7 @@ LCD_TC1602A::data_t LCD_TC1602A::ReadData()
     return data;
 }
 
-void LCD_TC1602A::SetupCommand(RegisterSelect rs, IOMode mode)
+void LCD_TC1602A::SetupCommand(RegisterSelect rs, IOMode mode) noexcept
 {
     SetRS(rs);
     Delay_100ns(1);
@@ -179,34 +204,43 @@ void LCD_TC1602A::SetupCommand(RegisterSelect rs, IOMode mode)
     Delay_100ns(1);
 }
 
-void LCD_TC1602A::SendWriteCommand(RegisterSelect rs, data_t data)
+void LCD_TC1602A::SendWriteCommand(RegisterSelect rs, data_t data) noexcept
 {
     static constexpr auto mode = IOMode::Write;
     static constexpr uint32_t max_command_time_ms = 5;  // Datasheet says 4.1ms max for clear display and return home.
 
     SetupDataPins(mode);
     SetupCommand(rs, mode);
-    // Cycle start
-    SetEnable(true);
-    SetData(data);
-    Delay_100ns(2);	// Min tPW is 150ns.
-    SetEnable(false);
+    {
+        AutoEnable auto_enable{ *this };
+        SetData(data);
+        Delay_100ns(2);	// Min tPW is 150ns.
+    }
     Delay_100ns(2);	// Min cycle time is 400ns.
 
     WaitUntilReady(max_command_time_ms);
 }
 
-LCD_TC1602A::data_t LCD_TC1602A::SendReadCommand(RegisterSelect rs)
+void LCD_TC1602A::SendWriteCommand(RegisterSelect rs, const std::span<uint8_t>& data) noexcept
+{
+    for (auto byte : data)
+    {
+        SendWriteCommand(rs, byte);
+    }
+}
+
+LCD_TC1602A::data_t LCD_TC1602A::SendReadCommand(RegisterSelect rs) noexcept
 {
     static constexpr auto mode = IOMode::Read;
 
     SetupDataPins(mode);
     SetupCommand(rs, mode);
-    // Cycle start
-    SetEnable(true);
-    Delay_100ns(2); // Min pulse width is 150ns.
-    auto data = ReadData();
-    SetEnable(false);
+    data_t data;
+    {
+        AutoEnable auto_enable{ *this };
+        Delay_100ns(2); // Min pulse width is 150ns.
+        data = ReadData();
+    }
     Delay_100ns(2); // Min cycle time is 400ns.
     return data;
 }
