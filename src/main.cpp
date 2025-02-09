@@ -9,19 +9,19 @@
 TIM_HandleTypeDef htim2;
 USART_HandleTypeDef husart2;
 
-void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_TIM2_Init(void);
-static void MX_USART2_Init(void);
+static void SystemClock_Config();
+static void MX_GPIO_Init();
+static void MX_TIM2_Init();
+static void MX_USART2_Init();
 
-void Error_Handler(void);
+static void Error_Handler(const char* file, int line);
 
-void SetTempPinMode(bool input);
-bool ReadTempPin();
-void WriteTempPin(bool state);
-bool WaitForTempPin(bool state, uint32_t timeout_us);
-uint32_t WaitForTempPinPulse(bool state);
-bool ReadTempData(float* humidity, float* temp);
+static void SetTempPinMode(bool input);
+static bool ReadTempPin();
+static void WriteTempPin(bool state);
+static bool WaitForTempPin(bool state, uint32_t timeout_us);
+static uint32_t WaitForTempPinPulse(bool state);
+static bool ReadTempData(float* humidity, float* temp);
 
 int main()
 {
@@ -55,7 +55,10 @@ int main()
 	};
 	lcd.SetSettings(lcd_settings);
 	lcd.Clear();
-	lcd.SetCursor(0, 0);
+	if (!lcd.SetCursor(0, 0))
+	{
+		Error_Handler(__FILE__, __LINE__);
+	}
 
 	static constexpr uint32_t update_interval_ms = 2000;
 	uint32_t last_temp_update = HAL_GetTick();
@@ -75,7 +78,10 @@ int main()
 					lcd.Write(static_cast<uint8_t>(buffer[i]));
 				}
 
-				lcd.SetCursor(1, 0);
+				if (!lcd.SetCursor(1, 0))
+				{
+					Error_Handler(__FILE__, __LINE__);
+				}
 
 				length = sprintf(buffer, "Temp     : %.1fC", temp);
 				for (int i = 0; i < length; i++)
@@ -83,7 +89,10 @@ int main()
 					lcd.Write(static_cast<uint8_t>(buffer[i]));
 				}
 
-				lcd.SetCursor(0, 0);
+				if (!lcd.SetCursor(0, 0))
+				{
+					Error_Handler(__FILE__, __LINE__);
+				}
 
 				// PrintLine(
 				// 	"Humidity    : %.1f%%\r\n"
@@ -99,7 +108,7 @@ int main()
 	}
 }
 
-void SystemClock_Config(void)
+static void SystemClock_Config(void)
 {
 	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
 	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
@@ -121,7 +130,7 @@ void SystemClock_Config(void)
 	RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
 	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 	/** Initializes the CPU, AHB and APB buses clocks
 	 */
@@ -134,19 +143,19 @@ void SystemClock_Config(void)
 
 	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 	PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2;
 	PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
 	if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 	/** Configure the main internal regulator output voltage
 	 */
 	if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 }
 
@@ -163,18 +172,18 @@ static void MX_TIM2_Init(void)
 	htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 	if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 	sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
 	if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
 	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
 	if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 }
 
@@ -191,7 +200,7 @@ static void MX_USART2_Init(void)
 	husart2.Init.CLKLastBit = USART_LASTBIT_DISABLE;
 	if (HAL_USART_Init(&husart2) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 }
 
@@ -243,15 +252,17 @@ static void MX_GPIO_Init(void)
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 }
 
-void Error_Handler(void)
+static void Error_Handler(const char* file, int line)
 {
+	PrintLine("%s:%d", file, line);
+
 	__disable_irq();
 	while (1)
 	{
 	}
 }
 
-void SetTempPinMode(bool input)
+static void SetTempPinMode(bool input)
 {
 	GPIO_InitTypeDef GPIO_InitStruct
 	{
@@ -263,17 +274,17 @@ void SetTempPinMode(bool input)
 	HAL_GPIO_Init(TEMP_DATA_GPIO_Port, &GPIO_InitStruct);
 }
 
-bool ReadTempPin()
+static bool ReadTempPin()
 {
 	return HAL_GPIO_ReadPin(TEMP_DATA_GPIO_Port, TEMP_DATA_Pin);
 }
 
-void WriteTempPin(bool state)
+static void WriteTempPin(bool state)
 {
 	HAL_GPIO_WritePin(TEMP_DATA_GPIO_Port, TEMP_DATA_Pin, state ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
-bool WaitForTempPin(bool state, uint32_t timeout_us)
+static bool WaitForTempPin(bool state, uint32_t timeout_us)
 {
 	uint32_t start = Timer_us();
 	while (true)
@@ -290,7 +301,7 @@ bool WaitForTempPin(bool state, uint32_t timeout_us)
 	}
 }
 
-uint32_t WaitForTempPinPulse(bool state)
+static uint32_t WaitForTempPinPulse(bool state)
 {
 	uint32_t start = Timer_us();
 	while (ReadTempPin() == state) ;
@@ -304,7 +315,7 @@ struct RHT03Data
 	uint8_t checksum;
 };
 
-bool ReadTempData(float* humidity, float* temp)
+static bool ReadTempData(float* humidity, float* temp)
 {
 	SetTempPinMode(true);
 	if (!WaitForTempPin(true, 1000))

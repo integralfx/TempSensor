@@ -38,11 +38,11 @@ template<typename T>
 class ILCDBase
 {
 public:
-    void Init(const LCDInit& init)
+    void Init(const LCDInit& init) noexcept
     {
         Impl().Init(init);
     }
-    void SetSettings(const LCDSettings& settings)
+    void SetSettings(const LCDSettings& settings) noexcept
     {
         Impl().SetSettings(settings);
     }
@@ -50,19 +50,19 @@ public:
     {
         Impl().Clear();
     }
-    void SetAddress(uint8_t address)
+    void SetAddress(uint8_t address) noexcept
     {
         Impl().SetAddress(address);
     }
-    void Read(uint8_t& out_data)
+    void Read(uint8_t& out_data) noexcept
     {
         Impl().Read(out_data);
     }
-    void Write(uint8_t data)
+    void Write(uint8_t data) noexcept
     {
         Impl().Write(data);
     }
-    bool IsBusy(uint8_t& address_counter)
+    [[nodiscard]] bool IsBusy(uint8_t& address_counter) noexcept
     {
         return Impl().IsBusy(address_counter);
     }
@@ -78,36 +78,36 @@ class ILCD
 {
 public:
     template<typename T>
-    explicit ILCD(ILCDBase<T>& ilcd_base)
+    explicit ILCD(ILCDBase<T>& ilcd_base) noexcept
     {
         m_impl_ptr = &ilcd_base;
-        static constexpr auto impl = +[](void* this_ptr) { return *static_cast<ILCDBase<T>*>(this_ptr); };
-        m_init = +[](void* this_ptr, const LCDInit& init) { impl(this_ptr).Init(init); };
-        m_set_settings = +[](void* this_ptr, const LCDSettings& settings) { impl(this_ptr).SetSettings(settings); };
-        m_clear = +[](void* this_ptr) { impl(this_ptr).Clear(); };
-        m_set_address = +[](void* this_ptr, uint8_t address) { impl(this_ptr).SetAddress(address); };
-        m_read = +[](void* this_ptr, uint8_t& out_data) { impl(this_ptr).Read(out_data); };
-        m_write = +[](void* this_ptr, uint8_t data) { impl(this_ptr).Write(data); };
-        m_is_busy = +[](void* this_ptr, uint8_t& address_counter) { return impl(this_ptr).IsBusy(address_counter); };
+        static constexpr auto impl = +[](void* this_ptr) noexcept { return *static_cast<ILCDBase<T>*>(this_ptr); };
+        m_init = +[](void* this_ptr, const LCDInit& init) noexcept { impl(this_ptr).Init(init); };
+        m_set_settings = +[](void* this_ptr, const LCDSettings& settings) noexcept { impl(this_ptr).SetSettings(settings); };
+        m_clear = +[](void* this_ptr) noexcept { impl(this_ptr).Clear(); };
+        m_set_address = +[](void* this_ptr, uint8_t address) noexcept { impl(this_ptr).SetAddress(address); };
+        m_read = +[](void* this_ptr, uint8_t& out_data) noexcept { impl(this_ptr).Read(out_data); };
+        m_write = +[](void* this_ptr, uint8_t data) noexcept { impl(this_ptr).Write(data); };
+        m_is_busy = +[](void* this_ptr, uint8_t& address_counter) noexcept { return impl(this_ptr).IsBusy(address_counter); };
     }
 
-    void Init(const LCDInit& init);
-    void SetSettings(const LCDSettings& settings);
-    void Clear();
-    void SetAddress(uint8_t address);
-    void Read(uint8_t& out_data);
-    void Write(uint8_t data);
-    bool IsBusy(uint8_t& address_counter);
+    void Init(const LCDInit& init) noexcept;
+    void SetSettings(const LCDSettings& settings) noexcept;
+    void Clear() noexcept;
+    void SetAddress(uint8_t address) noexcept;
+    void Read(uint8_t& out_data) noexcept;
+    void Write(uint8_t data) noexcept;
+    [[nodiscard]] bool IsBusy(uint8_t& address_counter) noexcept;
 
 private:
     void* m_impl_ptr;
-    using init_fn = void(*)(void*, const LCDInit&);
-    using set_settings_fn = void(*)(void*, const LCDSettings&);
-    using clear_fn = void(*)(void*);
-    using set_address_fn = void(*)(void*, uint8_t);
-    using read_fn = void(*)(void*, uint8_t&);
-    using write_fn = void(*)(void*, uint8_t);
-    using is_busy_fn = bool(*)(void*, uint8_t&);
+    using init_fn = void(*)(void*, const LCDInit&) noexcept;
+    using set_settings_fn = void(*)(void*, const LCDSettings&) noexcept;
+    using clear_fn = void(*)(void*) noexcept;
+    using set_address_fn = void(*)(void*, uint8_t) noexcept;
+    using read_fn = void(*)(void*, uint8_t&) noexcept;
+    using write_fn = void(*)(void*, uint8_t) noexcept;
+    using is_busy_fn = bool(*)(void*, uint8_t&) noexcept;
     init_fn m_init;
     set_settings_fn m_set_settings;
     clear_fn m_clear;
@@ -120,17 +120,17 @@ private:
 class LCD
 {
 public:
-    explicit LCD(ILCD& ilcd);
+    explicit LCD(ILCD& ilcd) noexcept;
 
-    void Init(const LCDInit& lcd_init);
-    LCDSettings GetSettings() const;
-    void SetSettings(const LCDSettings& lcd_settings);
-    void Clear();
-    void SetAddress(uint8_t address);
-    bool SetCursor(uint8_t row, uint8_t col);
-    void Read(uint8_t& out_data);
-    void Write(uint8_t data);
-    bool IsBusy(uint8_t& address_counter);
+    void Init(const LCDInit& lcd_init) noexcept;
+    LCDSettings GetSettings() const noexcept;
+    void SetSettings(const LCDSettings& lcd_settings) noexcept;
+    void Clear() noexcept;
+    void SetAddress(uint8_t address) noexcept;
+    [[nodiscard]] bool SetCursor(uint8_t row, uint8_t col) noexcept;
+    void Read(uint8_t& out_data) noexcept;
+    void Write(uint8_t data) noexcept;
+    [[nodiscard]] bool IsBusy(uint8_t& address_counter) noexcept;
 
 private:
     ILCD& m_ilcd;
