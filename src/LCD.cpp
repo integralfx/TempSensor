@@ -81,10 +81,10 @@ bool LCD::SetCursor(uint8_t row, uint8_t col) noexcept
         case LCDInit::Rows::One: return 1;
         case LCDInit::Rows::Two: return 2;
         }
-        __builtin_unreachable();
+        return 0;
     }();
 
-    if (row > row_count || col > m_init.column_count)
+    if (row >= row_count || col >= m_init.column_count)
     {
         return false;
     }
