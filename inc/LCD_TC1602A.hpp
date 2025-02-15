@@ -2,7 +2,7 @@
 #include "LCD.hpp"
 #include <bitset>
 
-class LCD_TC1602A : public ILCDBase<LCD_TC1602A>
+class LCD_TC1602A : public ILCD<LCD_TC1602A>
 {
 public:
     using data_t = std::bitset<8>;

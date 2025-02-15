@@ -20,6 +20,8 @@ The LCD will automatically initialise on bootup.
 
 The data size (4 or 8 bits), number of lines and character font must be set during this phase. They can not changed after.
 
+## Polymorphism using CRTP
+
 ```mermaid
 classDiagram
     class LCDInit {
@@ -35,7 +37,7 @@ classDiagram
         +bool cursor_blink
     }
 
-    class ILCDBase~T~ {
+    class ILCD~T~ {
         +Init(lcd_init) bool
         +GetSettings() LCDSettings
         +SetSettings(lcd_settings) bool
@@ -46,23 +48,8 @@ classDiagram
         +IsBusy(&address_counter) bool
     }
 
-    class ILCD {
-        -m_ilcd_base_ptr
-        -m_send_cmd
-
-        +ILCD(ilcd_base)
-        +Init(lcd_init) bool
-        +GetSettings() LCDSettings
-        +SetSettings(lcd_settings) bool
-        +Clear() bool
-        +Read(&data) bool
-        +Write(data) bool
-        +SetCursor(row, col) bool
-        +IsBusy(&address_counter) bool
-    }
-
-    class LCD {
-        -ILCD m_ilcd
+    class LCD~T~ {
+        -ILCD~T~ m_ilcd
         -LCDInit m_init
         -LCDSettings m_settings
 
@@ -88,12 +75,13 @@ classDiagram
         +IsBusy(&address_counter) bool
     }
 
-    ILCDBase~T~ <.. ILCD
     ILCD <.. LCD
     ILCD <|-- LCD_TC1602A
 ```
 
 `ILCDBase<T>` uses CRTP to achieve polymorphism. The concrete implementation (`LCD_TC1602A`) will inherit this base class and implement all of the functions. This allows the interface (`ILCDBase<T>`) to use the concrete implementation (`LCD_TC1602A`).
+
+## Type Erasure
 
 ```cpp
 template<typename T>
@@ -141,10 +129,13 @@ class LCD_TC1602A : ILCDBase<LCDImpl>
 };
 ```
 
-The issue that comes with this approach is that you will need to make `LCD` a templated class since you don't know what `T` is.
+The issue that comes with CRTP is that you will need to make `LCD` a templated class since you don't know what `T` is.
 
 To solve this, we can use type-erasure which will convert the object pointer to `void*`. We store the address of the concrete implementation's object and the function pointer (note the extra `void*` parameter). We can use some template magic to capture `T` in the constructor, allowing us to call `T::Init()`. This is the `ILCD` class.
 
 We can then inject `ILCD` into `LCD` which means `LCD` only relies on the interface rather than the concrete implementation. This will allow us inject a fake `ILCD` during unit tests.
 
 `ILCD` and `LCD` could be merged but I wanted to keep the boilerplate code outside of the `LCD` class.
+
+This becomes very tedious to maintain as you will need to implement the function 3 times (`ILCDBase`, `ILCD` and the concrete class).  
+I have opted to making `LCD` a template class which would mean more code space is used but that is not a concern for now.

@@ -36,8 +36,7 @@ int main()
 	HAL_TIM_Base_Start(&htim2);
 
 	LCD_TC1602A lcd_tc1602a;
-	ILCD ilcd{ lcd_tc1602a };
-	LCD lcd{ ilcd };
+	LCD lcd{ lcd_tc1602a };
 
 	LCDInit lcd_init
 	{
@@ -75,7 +74,11 @@ int main()
 
 				{
 					auto length = sprintf(reinterpret_cast<char*>(buffer.data()), "Humidity : %.1f%%", humidity);
-					lcd.WriteRow({ buffer.begin(), buffer.begin() + length });
+					auto bytes_written = lcd.WriteRow({ buffer.begin(), buffer.begin() + length });
+					if (bytes_written != static_cast<size_t>(length))
+					{
+						PrintLine("Wrote %d bytes. Expected %d bytes.", bytes_written, length);
+					}
 				}
 
 				if (!lcd.SetCursor(1, 0))
@@ -85,7 +88,11 @@ int main()
 
 				{
 					auto length = sprintf(reinterpret_cast<char*>(buffer.data()), "Temp     : %.1fC", temp);
-					lcd.WriteRow({ buffer.begin(), buffer.begin() + length });
+					auto bytes_written = lcd.WriteRow({ buffer.begin(), buffer.begin() + length });
+					if (bytes_written != static_cast<size_t>(length))
+					{
+						PrintLine("Wrote %d bytes. Expected %d bytes.", bytes_written, length);
+					}
 				}
 
 				// PrintLine(
