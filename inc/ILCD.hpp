@@ -55,17 +55,21 @@ public:
     {
         Impl().SetAddress(address);
     }
-    void Read(uint8_t& out_data) noexcept
+    [[nodiscard]] uint8_t Read() noexcept
     {
-        Impl().Read(out_data);
+        return Impl().Read();
+    }
+    [[nodiscard]] size_t Read(std::span<uint8_t> buffer) noexcept
+    {
+        return Impl().Read(buffer);
     }
     void Write(uint8_t data) noexcept
     {
         Impl().Write(data);
     }
-    [[nodiscard]] size_t WriteRow(const std::span<uint8_t>& data) noexcept
+    [[nodiscard]] size_t Write(const std::span<uint8_t>& data) noexcept
     {
-        return Impl().WriteRow(data);
+        return Impl().Write(data);
     }
     [[nodiscard]] bool IsBusy(uint8_t& address_counter) noexcept
     {

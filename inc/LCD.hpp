@@ -47,14 +47,19 @@ public:
             return false;
         }
 
-        uint8_t address = row * m_init.column_count + row;
+        uint8_t address = row * m_init.column_count + col;
         SetAddress(0b10000000 | address);
         return true;
     }
 
-    void Read(uint8_t& out_data) noexcept
+    [[nodiscard]] uint8_t Read() noexcept
     {
-        m_ilcd.Read(out_data);
+        return m_ilcd.Read();
+    }
+
+    [[nodiscard]] size_t Read(std::span<uint8_t> buffer) noexcept
+    {
+        return m_ilcd.Read(buffer);
     }
 
     void Write(uint8_t data) noexcept
@@ -62,14 +67,14 @@ public:
         m_ilcd.Write(data);
     }
 
-    [[nodiscard]] size_t WriteRow(const std::span<uint8_t>& data) noexcept
+    [[nodiscard]] size_t Write(const std::span<uint8_t>& data) noexcept
     {
         uint8_t address_counter;
         UNUSED(IsBusy(address_counter));
         auto total_cells = GetRowCount() * m_init.column_count;
         auto available_cells = total_cells - address_counter;
         auto size = std::min(data.size(), available_cells);
-        return m_ilcd.WriteRow(data.subspan(0, size));
+        return m_ilcd.Write(data.subspan(0, size));
     }
 
     [[nodiscard]] bool IsBusy(uint8_t& address_counter) noexcept

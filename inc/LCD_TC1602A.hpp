@@ -11,9 +11,10 @@ public:
     void SetSettings(const LCDSettings& settings) noexcept;
     void Clear() noexcept;
     void SetAddress(uint8_t address) noexcept;
-    void Read(uint8_t& out_data) noexcept;
+    [[nodiscard]] uint8_t Read() noexcept;
+    [[nodiscard]] size_t Read(std::span<uint8_t> buffer) noexcept;
     void Write(uint8_t data) noexcept;
-    [[nodiscard]] size_t WriteRow(const std::span<uint8_t>& data) noexcept;
+    [[nodiscard]] size_t Write(const std::span<uint8_t>& data) noexcept;
     [[nodiscard]] bool IsBusy(uint8_t& address_counter) noexcept;
 
 private:
@@ -42,7 +43,6 @@ private:
 
     void SetupCommand(RegisterSelect rs, IOMode mode) noexcept;
     void SendWriteCommand(RegisterSelect rs, data_t data) noexcept;
-    void SendWriteCommand(RegisterSelect rs, const std::span<uint8_t>& data) noexcept;
     [[nodiscard]] data_t SendReadCommand(RegisterSelect rs) noexcept;
 
     friend class AutoEnable;

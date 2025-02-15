@@ -19,6 +19,8 @@ namespace
         { LCD_D6_GPIO_Port, LCD_D6_Pin },
         { LCD_D7_GPIO_Port, LCD_D7_Pin }
     } };
+
+    static constexpr uint32_t max_command_time_ms = 5;  // Datasheet says 4.1ms max for clear display and return home.
 }
 
 class AutoEnable
@@ -70,10 +72,21 @@ void LCD_TC1602A::SetAddress(uint8_t address) noexcept
     SendWriteCommand(RegisterSelect::Instruction, address);
 }
 
-void LCD_TC1602A::Read(uint8_t& out_data) noexcept
+uint8_t LCD_TC1602A::Read() noexcept
 {
     auto data = SendReadCommand(RegisterSelect::Data);
-    out_data = static_cast<uint8_t>(data.to_ulong());
+    return static_cast<uint8_t>(data.to_ulong());
+}
+
+size_t LCD_TC1602A::Read(std::span<uint8_t> buffer) noexcept
+{
+    for (auto& byte : buffer)
+    {
+        auto data = SendReadCommand(RegisterSelect::Data);
+        byte = static_cast<uint8_t>(data.to_ulong());
+        WaitUntilReady(max_command_time_ms);
+    }
+    return buffer.size();
 }
 
 void LCD_TC1602A::Write(uint8_t data) noexcept
@@ -81,9 +94,12 @@ void LCD_TC1602A::Write(uint8_t data) noexcept
     SendWriteCommand(RegisterSelect::Data, data);
 }
 
-size_t LCD_TC1602A::WriteRow(const std::span<uint8_t>& data) noexcept
+size_t LCD_TC1602A::Write(const std::span<uint8_t>& data) noexcept
 {
-    SendWriteCommand(RegisterSelect::Data, data);
+    for (auto byte : data)
+    {
+        SendWriteCommand(RegisterSelect::Data, byte);
+    }
     return data.size();
 }
 
@@ -199,15 +215,13 @@ LCD_TC1602A::data_t LCD_TC1602A::ReadData() noexcept
 void LCD_TC1602A::SetupCommand(RegisterSelect rs, IOMode mode) noexcept
 {
     SetRS(rs);
-    Delay_100ns(1);
     SetIOMode(mode);
-    Delay_100ns(1);
+    Delay_100ns(1); // tSP1 is 30 ns
 }
 
 void LCD_TC1602A::SendWriteCommand(RegisterSelect rs, data_t data) noexcept
 {
     static constexpr auto mode = IOMode::Write;
-    static constexpr uint32_t max_command_time_ms = 5;  // Datasheet says 4.1ms max for clear display and return home.
 
     SetupDataPins(mode);
     SetupCommand(rs, mode);
@@ -221,14 +235,6 @@ void LCD_TC1602A::SendWriteCommand(RegisterSelect rs, data_t data) noexcept
     WaitUntilReady(max_command_time_ms);
 }
 
-void LCD_TC1602A::SendWriteCommand(RegisterSelect rs, const std::span<uint8_t>& data) noexcept
-{
-    for (auto byte : data)
-    {
-        SendWriteCommand(rs, byte);
-    }
-}
-
 LCD_TC1602A::data_t LCD_TC1602A::SendReadCommand(RegisterSelect rs) noexcept
 {
     static constexpr auto mode = IOMode::Read;
@@ -238,9 +244,10 @@ LCD_TC1602A::data_t LCD_TC1602A::SendReadCommand(RegisterSelect rs) noexcept
     data_t data;
     {
         AutoEnable auto_enable{ *this };
-        Delay_100ns(2); // Min pulse width is 150ns.
+        Delay_100ns(1); // tD max = 100 ns
         data = ReadData();
+        Delay_100ns(1);  // tPW min = 150 ns
     }
-    Delay_100ns(2); // Min cycle time is 400ns.
+    Delay_100ns(2); // tC min = 400 ns
     return data;
 }

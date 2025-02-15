@@ -57,7 +57,19 @@ int main()
 
 	static constexpr uint32_t update_interval_ms = 2000;
 	uint32_t last_temp_update = HAL_GetTick();
-	std::array<uint8_t, 16> buffer;
+	std::array<uint8_t, 32> buffer;
+	auto print_lcd_data = [&](uint8_t row, size_t max_bytes_to_read)
+	{
+		if (!lcd.SetCursor(row, 0))
+		{
+			Error_Handler(__FILE__, __LINE__);
+		}
+
+		auto bytes_read = lcd.Read(std::span<uint8_t>{ buffer }.subspan(0, max_bytes_to_read));
+		buffer[bytes_read] = 0;
+
+		PrintLine("Row %d: %s", row, buffer.data());
+	};
 	while (1)
 	{
 		uint32_t now = HAL_GetTick();
@@ -74,11 +86,13 @@ int main()
 
 				{
 					auto length = sprintf(reinterpret_cast<char*>(buffer.data()), "Humidity : %.1f%%", humidity);
-					auto bytes_written = lcd.WriteRow({ buffer.begin(), buffer.begin() + length });
+					auto bytes_written = lcd.Write({ buffer.begin(), buffer.begin() + length });
 					if (bytes_written != static_cast<size_t>(length))
 					{
 						PrintLine("Wrote %d bytes. Expected %d bytes.", bytes_written, length);
 					}
+
+					print_lcd_data(0, bytes_written);
 				}
 
 				if (!lcd.SetCursor(1, 0))
@@ -88,11 +102,13 @@ int main()
 
 				{
 					auto length = sprintf(reinterpret_cast<char*>(buffer.data()), "Temp     : %.1fC", temp);
-					auto bytes_written = lcd.WriteRow({ buffer.begin(), buffer.begin() + length });
+					auto bytes_written = lcd.Write({ buffer.begin(), buffer.begin() + length });
 					if (bytes_written != static_cast<size_t>(length))
 					{
 						PrintLine("Wrote %d bytes. Expected %d bytes.", bytes_written, length);
 					}
+
+					print_lcd_data(1, bytes_written);
 				}
 
 				// PrintLine(
