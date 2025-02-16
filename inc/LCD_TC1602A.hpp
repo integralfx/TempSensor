@@ -11,7 +11,7 @@ public:
     void SetSettings(const LCDSettings& settings) noexcept;
     void Clear() noexcept;
     void ReturnHome() noexcept;
-    void SetAddress(uint8_t address) noexcept;
+    void SetAddress(LCDAddress type, uint8_t address) noexcept;
     void SetCursor(uint8_t row, uint8_t col) noexcept;
     void SetDisplayScroll(bool enable) noexcept;
     void SetDisplayScrollDirection(LCDScrollDirection dir) noexcept;
@@ -47,9 +47,7 @@ private:
         EntryMode,
         DisplayControl,
         CursorDisplayShift,
-        Function,
-        CGRAM,  // TODO
-        DDRAM   // TODO
+        Function
     };
 
     bool WaitUntilReady(uint32_t timeout_ms) noexcept;

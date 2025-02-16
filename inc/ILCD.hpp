@@ -41,6 +41,12 @@ enum class LCDScrollDirection : bool
     Right
 };
 
+enum class LCDAddress : uint8_t
+{
+    CGRAM = 6,
+    DDRAM = 7
+};
+
 template<typename T>
 class ILCD
 {
@@ -61,9 +67,9 @@ public:
     {
         Impl().ReturnHome();
     }
-    void SetAddress(uint8_t address) noexcept
+    void SetAddress(LCDAddress type, uint8_t address) noexcept
     {
-        Impl().SetAddress(address);
+        Impl().SetAddress(type, address);
     }
     void SetCursor(uint8_t row, uint8_t col) noexcept
     {

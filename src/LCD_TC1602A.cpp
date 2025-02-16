@@ -90,16 +90,18 @@ void LCD_TC1602A::ReturnHome() noexcept
     SendWriteCommandAndWait(RegisterSelect::Instruction, data);    
 }
 
-void LCD_TC1602A::SetAddress(uint8_t address) noexcept
+void LCD_TC1602A::SetAddress(LCDAddress type, uint8_t address) noexcept
 {
-    SendWriteCommandAndWait(RegisterSelect::Instruction, address);
+    data_t data{ address };
+    data.set(static_cast<uint8_t>(type));
+    SendWriteCommandAndWait(RegisterSelect::Instruction, data);
 }
 
 void LCD_TC1602A::SetCursor(uint8_t row, uint8_t col) noexcept
 {
     static constexpr std::array row_offsets{ 0, 0x40 };
     uint8_t address = static_cast<uint8_t>(row_offsets[row] + col);
-    SetAddress(0b10000000 | address);
+    SetAddress(LCDAddress::DDRAM, address);
 }
 
 void LCD_TC1602A::SetDisplayScroll(bool enable) noexcept

@@ -39,9 +39,9 @@ public:
         m_ilcd.ReturnHome();
     }
 
-    void SetAddress(uint8_t address) noexcept
+    void SetAddress(LCDAddress type, uint8_t address) noexcept
     {
-        m_ilcd.SetAddress(address);
+        m_ilcd.SetAddress(type, address);
     }
 
     [[nodiscard]] bool SetCursor(uint8_t row, uint8_t col) noexcept
