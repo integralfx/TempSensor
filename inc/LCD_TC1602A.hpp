@@ -10,6 +10,7 @@ public:
     void Init(const LCDInit& init) noexcept;
     void SetSettings(const LCDSettings& settings) noexcept;
     void Clear() noexcept;
+    void ReturnHome() noexcept;
     void SetAddress(uint8_t address) noexcept;
     void SetCursor(uint8_t row, uint8_t col) noexcept;
     void SetDisplayScroll(bool enable) noexcept;
@@ -42,7 +43,7 @@ private:
     enum class CommandIndex : size_t
     {
         ClearDisplay,
-        ReturnHome, // TODO
+        ReturnHome,
         EntryMode,
         DisplayControl,
         CursorDisplayShift,

@@ -53,6 +53,7 @@ int main()
 		.cursor_blink = false
 	};
 	lcd.SetSettings(lcd_settings);
+	lcd.ReturnHome();
 
 	static constexpr uint32_t update_interval_ms = 2000;
 	uint32_t last_temp_update = HAL_GetTick();

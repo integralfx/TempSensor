@@ -53,9 +53,13 @@ public:
     {
         Impl().SetSettings(settings);
     }
-    void Clear()
+    void Clear() noexcept
     {
         Impl().Clear();
+    }
+    void ReturnHome() noexcept
+    {
+        Impl().ReturnHome();
     }
     void SetAddress(uint8_t address) noexcept
     {
@@ -95,7 +99,7 @@ public:
     }
 
 private:
-    T& Impl()
+    T& Impl() noexcept
     {
         return *static_cast<T*>(this);
     }

@@ -34,6 +34,11 @@ public:
         m_ilcd.Clear();
     }
 
+    void ReturnHome() noexcept
+    {
+        m_ilcd.ReturnHome();
+    }
+
     void SetAddress(uint8_t address) noexcept
     {
         m_ilcd.SetAddress(address);

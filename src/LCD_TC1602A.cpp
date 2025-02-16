@@ -83,6 +83,13 @@ void LCD_TC1602A::Clear() noexcept
     SendWriteCommandAndWait(RegisterSelect::Instruction, data);
 }
 
+void LCD_TC1602A::ReturnHome() noexcept
+{
+    data_t data;
+    data.set(static_cast<size_t>(CommandIndex::ReturnHome));
+    SendWriteCommandAndWait(RegisterSelect::Instruction, data);    
+}
+
 void LCD_TC1602A::SetAddress(uint8_t address) noexcept
 {
     SendWriteCommandAndWait(RegisterSelect::Instruction, address);
