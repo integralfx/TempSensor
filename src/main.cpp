@@ -43,7 +43,7 @@ int main()
 		.data_size = LCDInit::DataSize::EightBits,
 		.row_count = LCDInit::Rows::Two,
 		.font_type = LCDInit::FontType::FiveByTenDots,
-		.column_count = 40
+		.column_count = 16
 	};
 	lcd.Init(lcd_init);
 	LCDSettings lcd_settings
@@ -53,7 +53,6 @@ int main()
 		.cursor_blink = false
 	};
 	lcd.SetSettings(lcd_settings);
-	lcd.Clear();
 
 	static constexpr uint32_t update_interval_ms = 2000;
 	uint32_t last_temp_update = HAL_GetTick();

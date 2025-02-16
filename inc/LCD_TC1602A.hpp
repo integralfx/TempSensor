@@ -11,6 +11,9 @@ public:
     void SetSettings(const LCDSettings& settings) noexcept;
     void Clear() noexcept;
     void SetAddress(uint8_t address) noexcept;
+    void SetCursor(uint8_t row, uint8_t col) noexcept;
+    void SetDisplayScroll(bool enable) noexcept;
+    void SetDisplayScrollDirection(LCDScrollDirection dir) noexcept;
     [[nodiscard]] uint8_t Read() noexcept;
     [[nodiscard]] size_t Read(std::span<uint8_t> buffer) noexcept;
     void Write(uint8_t data) noexcept;
@@ -18,8 +21,6 @@ public:
     [[nodiscard]] bool IsBusy(uint8_t& address_counter) noexcept;
 
 private:
-    bool WaitUntilReady(uint32_t timeout_ms) noexcept;
-
     enum class IOMode : uint8_t
     {
         Write,
@@ -32,6 +33,27 @@ private:
         Data
     };
 
+    enum class TextDirection : bool
+    {
+        RightToLeft,
+        LeftToRight
+    };
+
+    enum class CommandIndex : size_t
+    {
+        ClearDisplay,
+        ReturnHome, // TODO
+        EntryMode,
+        DisplayControl,
+        CursorDisplayShift,
+        Function,
+        CGRAM,  // TODO
+        DDRAM   // TODO
+    };
+
+    bool WaitUntilReady(uint32_t timeout_ms) noexcept;
+    void SetEntryMode(TextDirection dir, bool enableDisplayScroll) noexcept;
+
     void SetupDataPins(IOMode mode) noexcept;
 
     void SetRS(RegisterSelect rs) noexcept;
@@ -43,6 +65,7 @@ private:
 
     void SetupCommand(RegisterSelect rs, IOMode mode) noexcept;
     void SendWriteCommand(RegisterSelect rs, data_t data) noexcept;
+    void SendWriteCommandAndWait(RegisterSelect rs, data_t data) noexcept;
     [[nodiscard]] data_t SendReadCommand(RegisterSelect rs) noexcept;
 
     friend class AutoEnable;

@@ -35,6 +35,12 @@ struct LCDSettings
     bool cursor_blink;
 };
 
+enum class LCDScrollDirection : bool
+{
+    Left,
+    Right
+};
+
 template<typename T>
 class ILCD
 {
@@ -54,6 +60,18 @@ public:
     void SetAddress(uint8_t address) noexcept
     {
         Impl().SetAddress(address);
+    }
+    void SetCursor(uint8_t row, uint8_t col) noexcept
+    {
+        Impl().SetCursor(row, col);
+    }
+    void SetDisplayScroll(bool enable) noexcept
+    {
+        Impl().SetDisplayScroll(enable);
+    }
+    void SetDisplayScrollDirection(LCDScrollDirection dir) noexcept
+    {
+        Impl().SetDisplayScrollDirection(dir);
     }
     [[nodiscard]] uint8_t Read() noexcept
     {

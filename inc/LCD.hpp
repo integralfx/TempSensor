@@ -47,9 +47,18 @@ public:
             return false;
         }
 
-        uint8_t address = row * m_init.column_count + col;
-        SetAddress(0b10000000 | address);
+        m_ilcd.SetCursor(row, col);
         return true;
+    }
+
+    void SetDisplayScroll(bool enable) noexcept
+    {
+        m_ilcd.SetDisplayScroll(enable);
+    }
+
+    void SetDisplayScrollDirection(LCDScrollDirection dir) noexcept
+    {
+        m_ilcd.SetDisplayScrollDirection(dir);
     }
 
     [[nodiscard]] uint8_t Read() noexcept
@@ -69,12 +78,7 @@ public:
 
     [[nodiscard]] size_t Write(const std::span<uint8_t>& data) noexcept
     {
-        uint8_t address_counter;
-        UNUSED(IsBusy(address_counter));
-        auto total_cells = GetRowCount() * m_init.column_count;
-        auto available_cells = total_cells - address_counter;
-        auto size = std::min(data.size(), available_cells);
-        return m_ilcd.Write(data.subspan(0, size));
+        return m_ilcd.Write(data);
     }
 
     [[nodiscard]] bool IsBusy(uint8_t& address_counter) noexcept

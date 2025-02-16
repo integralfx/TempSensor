@@ -2,6 +2,8 @@
 
 [Datasheet (TC1602A-09T)](https://cdn-shop.adafruit.com/product-files/181/p181.pdf)
 
+[LiquidCrystal Arduino Library](https://github.com/arduino-libraries/LiquidCrystal)
+
 ## Commands
 
 This LCD has 2 command types indicated by the register select bit:
@@ -16,9 +18,10 @@ Refer to p10 of the datasheet for the list of commands.
 
 ## Initialisation
 
-The LCD will automatically initialise on bootup.
+The LCD must be initialised before use.
 
-The data size (4 or 8 bits), number of lines and character font must be set during this phase. They can not changed after.
+This involves setting the interface 4 times with various delays then setting the number of lines and font.
+They can not changed after initialisation.
 
 ## Polymorphism using CRTP
 

@@ -42,18 +42,34 @@ private:
 
 void LCD_TC1602A::Init(const LCDInit& init) noexcept
 {
+    HAL_Delay(80);  // Datasheet says > 40 ms after VDD > 2.7 V. Wait double to be sure.
+
     data_t data;
-    data.set(5);
+    data.set(static_cast<size_t>(CommandIndex::Function));
     data.set(4, static_cast<bool>(init.data_size));
     data.set(3, static_cast<bool>(init.row_count));
     data.set(2, static_cast<bool>(init.font_type));
-    SendWriteCommand(RegisterSelect::Instruction, data);
+
+    SendWriteCommand(RegisterSelect::Instruction, data);    // Can not check busy flag during this step
+    HAL_Delay(8);   // > 4.1 ms
+
+    SendWriteCommand(RegisterSelect::Instruction, data);    // Can not check busy flag during this step
+    Delay_us(200);   // > 100 us
+
+    SendWriteCommand(RegisterSelect::Instruction, data);    // Can not check busy flag during this step
+
+    SendWriteCommandAndWait(RegisterSelect::Instruction, data); // Can check busy flag now
+
+    SetSettings({});    // Display off
+    Clear();
+
+    SetEntryMode(TextDirection::LeftToRight, false);
 }
 
 void LCD_TC1602A::SetSettings(const LCDSettings& settings) noexcept
 {
     data_t data;
-    data.set(3);
+    data.set(static_cast<size_t>(CommandIndex::DisplayControl));
     data.set(2, settings.display_on);
     data.set(1, settings.cursor_on);
     data.set(0, settings.cursor_blink);
@@ -63,13 +79,34 @@ void LCD_TC1602A::SetSettings(const LCDSettings& settings) noexcept
 void LCD_TC1602A::Clear() noexcept
 {
     data_t data;
-    data.set(0);
-    SendWriteCommand(RegisterSelect::Instruction, data);
+    data.set(static_cast<size_t>(CommandIndex::ClearDisplay));
+    SendWriteCommandAndWait(RegisterSelect::Instruction, data);
 }
 
 void LCD_TC1602A::SetAddress(uint8_t address) noexcept
 {
-    SendWriteCommand(RegisterSelect::Instruction, address);
+    SendWriteCommandAndWait(RegisterSelect::Instruction, address);
+}
+
+void LCD_TC1602A::SetCursor(uint8_t row, uint8_t col) noexcept
+{
+    static constexpr std::array row_offsets{ 0, 0x40 };
+    uint8_t address = static_cast<uint8_t>(row_offsets[row] + col);
+    SetAddress(0b10000000 | address);
+}
+
+void LCD_TC1602A::SetDisplayScroll(bool enable) noexcept
+{
+    SetEntryMode(TextDirection::LeftToRight, enable);
+}
+
+void LCD_TC1602A::SetDisplayScrollDirection(LCDScrollDirection dir) noexcept
+{
+    data_t data;
+    data.set(static_cast<size_t>(CommandIndex::CursorDisplayShift));
+    data.set(3);
+    data.set(2, static_cast<bool>(dir));
+    SendWriteCommandAndWait(RegisterSelect::Instruction, data);
 }
 
 uint8_t LCD_TC1602A::Read() noexcept
@@ -91,16 +128,23 @@ size_t LCD_TC1602A::Read(std::span<uint8_t> buffer) noexcept
 
 void LCD_TC1602A::Write(uint8_t data) noexcept
 {
-    SendWriteCommand(RegisterSelect::Data, data);
+    SendWriteCommandAndWait(RegisterSelect::Data, data);
 }
 
 size_t LCD_TC1602A::Write(const std::span<uint8_t>& data) noexcept
 {
-    for (auto byte : data)
+    static constexpr size_t max_address = 80;
+
+    uint8_t curr_address;
+    UNUSED(IsBusy(curr_address));
+    auto end_address = std::min(curr_address + data.size(), max_address);
+    auto size = end_address - curr_address;
+
+    for (auto byte : data.subspan(0, size))
     {
-        SendWriteCommand(RegisterSelect::Data, byte);
+        SendWriteCommandAndWait(RegisterSelect::Data, byte);
     }
-    return data.size();
+    return size;
 }
 
 bool LCD_TC1602A::IsBusy(uint8_t& address_counter) noexcept
@@ -130,6 +174,15 @@ bool LCD_TC1602A::WaitUntilReady(uint32_t timeout_ms) noexcept
     }
 
     return false;
+}
+
+void LCD_TC1602A::SetEntryMode(TextDirection dir, bool enableDisplayScroll) noexcept
+{
+    data_t data;
+    data.set(static_cast<size_t>(CommandIndex::EntryMode));
+    data.set(1, static_cast<bool>(dir));
+    data.set(0, enableDisplayScroll);
+    SendWriteCommandAndWait(RegisterSelect::Instruction, data);
 }
 
 void LCD_TC1602A::SetupDataPins(IOMode mode) noexcept
@@ -231,7 +284,11 @@ void LCD_TC1602A::SendWriteCommand(RegisterSelect rs, data_t data) noexcept
         Delay_100ns(2);	// Min tPW is 150ns.
     }
     Delay_100ns(2);	// Min cycle time is 400ns.
+}
 
+void LCD_TC1602A::SendWriteCommandAndWait(RegisterSelect rs, data_t data) noexcept
+{
+    SendWriteCommand(rs, data);
     WaitUntilReady(max_command_time_ms);
 }
 
