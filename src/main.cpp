@@ -1,47 +1,29 @@
 #include "stm32l4xx_hal.h"
 #include "Pins.hpp"
-#include <cstdio>
-#include <cstdarg>
-#include <cstring>
+#include "LCD_TC1602A.hpp"
+#include "Serial.hpp"
+#include "Time.hpp"
 #include <array>
-#include <utility>
-#include <algorithm>
+#include <cstdio>
 
 TIM_HandleTypeDef htim2;
 USART_HandleTypeDef husart2;
 
-void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_TIM2_Init(void);
-static void MX_USART2_Init(void);
+static void SystemClock_Config();
+static void MX_GPIO_Init();
+static void MX_TIM2_Init();
+static void MX_USART2_Init();
 
-void Error_Handler(void);
+static void Error_Handler(const char* file, int line);
 
-uint32_t Timer_100ns();
-uint32_t Timer_us();
-void Delay_100ns(uint32_t multiplier);
-void Delay_us(uint32_t delay);
+static void SetTempPinMode(bool input);
+static bool ReadTempPin();
+static void WriteTempPin(bool state);
+static bool WaitForTempPin(bool state, uint32_t timeout_us);
+static uint32_t WaitForTempPinPulse(bool state);
+static bool ReadTempData(float* humidity, float* temp);
 
-void SetTempPinMode(bool input);
-bool ReadTempPin();
-void WriteTempPin(bool state);
-bool WaitForTempPin(bool state, uint32_t timeout_us);
-uint32_t WaitForTempPinPulse(bool state);
-bool ReadTempData(float* humidity, float* temp);
-
-void LCD_Clear();
-void LCD_ReturnHome();
-void LCD_SetControl(bool display_on, bool cursor_on, bool cursor_blink);
-void LCD_SetFunction(bool data_8bit, bool two_lines, bool font_10dots);
-void LCD_MoveScreen(bool right);
-void LCD_SetCursor(int row, int col, bool two_lines);
-void LCD_WriteChar(char c);
-void LCD_WriteStr(const char* str);
-
-bool Print(const char* format, ...);
-bool PrintLine(const char* format, ...);
-
-int main(void)
+int main()
 {
 	HAL_Init();
 
@@ -53,39 +35,87 @@ int main(void)
 
 	HAL_TIM_Base_Start(&htim2);
 
-	LCD_SetFunction(true, true, true);
-	Delay_us(53);
-	LCD_SetControl(true, false, false);
-	Delay_us(53);
-	LCD_Clear();
-	HAL_Delay(2);
-	LCD_ReturnHome();
-	HAL_Delay(2);
+	LCD_TC1602A lcd_tc1602a;
+	LCD lcd{ lcd_tc1602a };
 
-	/* Infinite loop */
+	LCDInit lcd_init
+	{
+		.data_size = LCDInit::DataSize::EightBits,
+		.row_count = LCDInit::Rows::Two,
+		.font_type = LCDInit::FontType::FiveByTenDots,
+		.column_count = 16
+	};
+	lcd.Init(lcd_init);
+	LCDSettings lcd_settings
+	{
+		.display_on = true,
+		.cursor_on = false,
+		.cursor_blink = false
+	};
+	lcd.SetSettings(lcd_settings);
+	lcd.ReturnHome();
+
+	static constexpr uint32_t update_interval_ms = 2000;
 	uint32_t last_temp_update = HAL_GetTick();
-	char buffer[16+1] = { 0 };
+	std::array<uint8_t, 32> buffer;
+	auto print_lcd_data = [&](uint8_t row, size_t max_bytes_to_read)
+	{
+		if (!lcd.SetCursor(row, 0))
+		{
+			Error_Handler(__FILE__, __LINE__);
+		}
+
+		auto bytes_read = lcd.Read(std::span<uint8_t>{ buffer }.subspan(0, max_bytes_to_read));
+		buffer[bytes_read] = 0;
+
+		PrintLine("Row %d: %s", row, buffer.data());
+	};
 	while (1)
 	{
 		uint32_t now = HAL_GetTick();
-		if (now - last_temp_update > 2000)
+		if (now - last_temp_update > update_interval_ms)
 		{
-			float humidity, temp;
+			float humidity = 0;
+			float temp = 0;
 			if (ReadTempData(&humidity, &temp))
 			{
-				sprintf(buffer, "Humidity : %.1f%%", humidity);
-				LCD_WriteStr(buffer);
-				sprintf(buffer, "Temp     : %.1fC", temp);
-				LCD_SetCursor(1, 0, true);
-				Delay_us(53);
-				LCD_WriteStr(buffer);
-				LCD_SetCursor(0, 0, true);
-//				PrintLine(
-//					"Humidity    : %.1f%%\r\n"
-//					"Temperature : %.1f°C\r\n",
-//					humidity, temp
-//				);
+				if (!lcd.SetCursor(0, 0))
+				{
+					Error_Handler(__FILE__, __LINE__);
+				}
 
+				{
+					auto length = sprintf(reinterpret_cast<char*>(buffer.data()), "Humidity : %.1f%%", humidity);
+					auto bytes_written = lcd.Write({ buffer.begin(), buffer.begin() + length });
+					if (bytes_written != static_cast<size_t>(length))
+					{
+						PrintLine("Wrote %d bytes. Expected %d bytes.", bytes_written, length);
+					}
+
+					print_lcd_data(0, bytes_written);
+				}
+
+				if (!lcd.SetCursor(1, 0))
+				{
+					Error_Handler(__FILE__, __LINE__);
+				}
+
+				{
+					auto length = sprintf(reinterpret_cast<char*>(buffer.data()), "Temp     : %.1fC", temp);
+					auto bytes_written = lcd.Write({ buffer.begin(), buffer.begin() + length });
+					if (bytes_written != static_cast<size_t>(length))
+					{
+						PrintLine("Wrote %d bytes. Expected %d bytes.", bytes_written, length);
+					}
+
+					print_lcd_data(1, bytes_written);
+				}
+
+				// PrintLine(
+				// 	"Humidity    : %.1f%%\r\n"
+				// 	"Temperature : %.1f°C\r\n",
+				// 	humidity, temp
+				// );
 			}
 
 			last_temp_update = now;
@@ -95,7 +125,7 @@ int main(void)
 	}
 }
 
-void SystemClock_Config(void)
+static void SystemClock_Config(void)
 {
 	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
 	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
@@ -117,7 +147,7 @@ void SystemClock_Config(void)
 	RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
 	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 	/** Initializes the CPU, AHB and APB buses clocks
 	 */
@@ -130,19 +160,19 @@ void SystemClock_Config(void)
 
 	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 	PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2;
 	PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
 	if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 	/** Configure the main internal regulator output voltage
 	 */
 	if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 }
 
@@ -159,18 +189,18 @@ static void MX_TIM2_Init(void)
 	htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 	if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 	sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
 	if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
 	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
 	if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 }
 
@@ -187,7 +217,7 @@ static void MX_USART2_Init(void)
 	husart2.Init.CLKLastBit = USART_LASTBIT_DISABLE;
 	if (HAL_USART_Init(&husart2) != HAL_OK)
 	{
-		Error_Handler();
+		Error_Handler(__FILE__, __LINE__);
 	}
 }
 
@@ -200,27 +230,27 @@ static void MX_GPIO_Init(void)
 	__HAL_RCC_GPIOB_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 
-	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOB, LCD_D1_Pin|LCD_E_Pin|LCD_D0_Pin|LCD_D6_Pin
-			|LCD_D2_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOC, LCD_D4_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOA, LCD_RS_Pin|LCD_D4_Pin|LCD_D3_Pin|LED_Pin
-			|LCD_D7_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB, LCD_D1_Pin|LCD_E_Pin|LCD_D0_Pin|LCD_D5_Pin|LCD_RW_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(LCD_D5_GPIO_Port, LCD_D5_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOA, LCD_RS_Pin|LCD_D3_Pin|LED_Pin|LCD_D7_Pin|LCD_D2_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin : BTN_Pin */
 	GPIO_InitStruct.Pin = BTN_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	HAL_GPIO_Init(BTN_GPIO_Port, &GPIO_InitStruct);
+	//
+	GPIO_InitStruct.Pin = LCD_D4_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : LCD_D1_Pin LCD_E_Pin LCD_D0_Pin LCD_D6_Pin
-                           LCD_D2_Pin */
-	GPIO_InitStruct.Pin = LCD_D1_Pin|LCD_E_Pin|LCD_D0_Pin|LCD_D6_Pin
-			|LCD_D2_Pin;
+	GPIO_InitStruct.Pin = LCD_D1_Pin|LCD_E_Pin|LCD_D0_Pin|LCD_D5_Pin|LCD_RW_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -232,57 +262,24 @@ static void MX_GPIO_Init(void)
 	GPIO_InitStruct.Pull = GPIO_PULLUP;
 	HAL_GPIO_Init(TEMP_DATA_GPIO_Port, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : LCD_RS_Pin LCD_D4_Pin LCD_D3_Pin LED_Pin
-                           LCD_D7_Pin */
-	GPIO_InitStruct.Pin = LCD_RS_Pin|LCD_D4_Pin|LCD_D3_Pin|LED_Pin
-			|LCD_D7_Pin;
+	GPIO_InitStruct.Pin = LCD_RS_Pin|LCD_D3_Pin|LED_Pin|LCD_D7_Pin|LCD_D2_Pin|LCD_D6_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-	/*Configure GPIO pin : LCD_D5_Pin */
-	GPIO_InitStruct.Pin = LCD_D5_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(LCD_D5_GPIO_Port, &GPIO_InitStruct);
-
 }
 
-void Error_Handler(void)
+static void Error_Handler(const char* file, int line)
 {
+	PrintLine("%s:%d", file, line);
+
 	__disable_irq();
 	while (1)
 	{
 	}
 }
 
-uint32_t Timer_100ns()
-{
-	 return __HAL_TIM_GET_COUNTER(&htim2);
-}
-
-uint32_t Timer_us()
-{
-	return Timer_100ns() / 10;
-}
-
-void Delay_100ns(uint32_t multiplier)
-{
-	// Timer has a frequency of 10MHz (100ns).
-	__HAL_TIM_SET_COUNTER(&htim2, 0);
-	while (Timer_100ns() < multiplier) ;
-}
-
-void Delay_us(uint32_t delay)
-{
-	// 1us = 1000ns, but we can only delay in increments of 100ns,
-	// hence why we multiply by 10.
-	Delay_100ns(delay * 10);
-}
-
-void SetTempPinMode(bool input)
+static void SetTempPinMode(bool input)
 {
 	GPIO_InitTypeDef GPIO_InitStruct
 	{
@@ -294,17 +291,17 @@ void SetTempPinMode(bool input)
 	HAL_GPIO_Init(TEMP_DATA_GPIO_Port, &GPIO_InitStruct);
 }
 
-bool ReadTempPin()
+static bool ReadTempPin()
 {
 	return HAL_GPIO_ReadPin(TEMP_DATA_GPIO_Port, TEMP_DATA_Pin);
 }
 
-void WriteTempPin(bool state)
+static void WriteTempPin(bool state)
 {
 	HAL_GPIO_WritePin(TEMP_DATA_GPIO_Port, TEMP_DATA_Pin, state ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
-bool WaitForTempPin(bool state, uint32_t timeout_us)
+static bool WaitForTempPin(bool state, uint32_t timeout_us)
 {
 	uint32_t start = Timer_us();
 	while (true)
@@ -321,7 +318,7 @@ bool WaitForTempPin(bool state, uint32_t timeout_us)
 	}
 }
 
-uint32_t WaitForTempPinPulse(bool state)
+static uint32_t WaitForTempPinPulse(bool state)
 {
 	uint32_t start = Timer_us();
 	while (ReadTempPin() == state) ;
@@ -335,7 +332,7 @@ struct RHT03Data
 	uint8_t checksum;
 };
 
-bool ReadTempData(float* humidity, float* temp)
+static bool ReadTempData(float* humidity, float* temp)
 {
 	SetTempPinMode(true);
 	if (!WaitForTempPin(true, 1000))
@@ -397,126 +394,4 @@ bool ReadTempData(float* humidity, float* temp)
 	*temp = data.temp / 10.0;
 
 	return true;
-}
-
-void LCD_SetRS(bool rs)
-{
-	HAL_GPIO_WritePin(LCD_RS_GPIO_Port, LCD_RS_Pin, rs ? GPIO_PIN_SET : GPIO_PIN_RESET);
-}
-
-void LCD_SetEnable(bool enable)
-{
-	HAL_GPIO_WritePin(LCD_E_GPIO_Port, LCD_E_Pin, enable ? GPIO_PIN_SET : GPIO_PIN_RESET);
-}
-
-void LCD_SetData(uint8_t data)
-{
-	static std::array<std::pair<GPIO_TypeDef*, uint16_t>, 8> LCD_data_pins
-	{ {
-		{ LCD_D0_GPIO_Port, LCD_D0_Pin },
-		{ LCD_D1_GPIO_Port, LCD_D1_Pin },
-		{ LCD_D2_GPIO_Port, LCD_D2_Pin },
-		{ LCD_D3_GPIO_Port, LCD_D3_Pin },
-		{ LCD_D4_GPIO_Port, LCD_D4_Pin },
-		{ LCD_D5_GPIO_Port, LCD_D5_Pin },
-		{ LCD_D6_GPIO_Port, LCD_D6_Pin },
-		{ LCD_D7_GPIO_Port, LCD_D7_Pin }
-	} };
-
-	for (size_t i = 0; i < LCD_data_pins.size(); ++i)
-	{
-		auto& pin = LCD_data_pins[i];
-		HAL_GPIO_WritePin(pin.first, pin.second, static_cast<GPIO_PinState>((data >> i) & 0x1));
-	}
-}
-
-void LCD_SendData(bool rs, uint8_t data)
-{
-	LCD_SetRS(rs);
-	Delay_100ns(1);
-	LCD_SetEnable(true);
-	LCD_SetData(data);
-	Delay_100ns(2);	// Min tPW is 150ns.
-	LCD_SetEnable(false);
-}
-
-void LCD_Clear()
-{
-	LCD_SendData(false, 1);
-}
-
-void LCD_ReturnHome()
-{
-	LCD_SendData(false, 0b10);
-}
-
-void LCD_SetControl(bool display_on, bool cursor_on, bool cursor_blink)
-{
-	LCD_SendData(false, 0b1000 | (display_on << 2) | (cursor_on << 1) | cursor_blink);
-}
-
-void LCD_SetFunction(bool data_8bit, bool two_lines, bool font_10dots)
-{
-	LCD_SendData(false, 0b100000 | (data_8bit << 4) | (two_lines << 3) | (font_10dots << 2));
-}
-
-void LCD_MoveScreen(bool right)
-{
-	//LCD_SendData(false, 0b11000 | (right << 2));
-	LCD_SendData(false, right ? 0b11100 : 0b11000);
-}
-
-void LCD_SetCursor(int row, int col, bool two_lines)
-{
-	row = std::min(row, two_lines ? 1 : 0);
-	col = std::min(col, two_lines ? 39 : 79);
-
-	uint8_t address = two_lines ? row * 40 + col : row + col;
-	LCD_SendData(false, 0b10000000 | address);
-}
-
-void LCD_WriteChar(char c)
-{
-	LCD_SendData(true, static_cast<uint8_t>(c));
-}
-
-void LCD_WriteStr(const char* str)
-{
-	while (*str)
-	{
-		LCD_WriteChar(*str++);
-		Delay_us(53);
-	}
-}
-
-
-bool Print(const char* format, ...)
-{
-	char str[100]{};
-	va_list args;
-	va_start(args, format);
-	int length = vsprintf(str, format, args);
-	va_end(args);
-	if (length < 0)
-	{
-		return false;
-	}
-
-	return HAL_USART_Transmit(&husart2, reinterpret_cast<uint8_t*>(str), length, 1000) == HAL_OK;
-}
-bool PrintLine(const char* format, ...)
-{
-	char str[100]{};
-	va_list args;
-	va_start(args, format);
-	int length = vsprintf(str, format, args);
-	va_end(args);
-	if (length < 0)
-	{
-		return false;
-	}
-	str[length++] = '\r';
-	str[length++] = '\n';
-
-	return HAL_USART_Transmit(&husart2, reinterpret_cast<uint8_t*>(str), length, 1000) == HAL_OK;
 }
